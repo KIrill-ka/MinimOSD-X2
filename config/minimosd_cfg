@@ -84,7 +84,7 @@ MOTOR_WARN_CURR 945
 VOFFSET 946
 HOFFSET 947
 MAV_BAUD 948
-FONT_LOADER_ON_ADDR 949
+FONT_LOADER_ON 949
 EEPROM_OLD_VER 1010
 EEPROM_NEW_VER 1014
 }
@@ -641,7 +641,7 @@ if {$op eq "writefont"} {
   set font_format "fnt"
  }
  set ofd [bl_connect]
- set fl_en [bl_read_eep $ofd $name2addr(FONT_LOADER_ON_ADDR) 1]
+ set fl_en [bl_read_eep $ofd $name2addr(FONT_LOADER_ON) 1]
  if {$fl_en eq ""} {
   my_error "no response from bootloader"
  }
@@ -652,7 +652,7 @@ if {$op eq "writefont"} {
  if {!$fl_en} {
   puts -nonewline "Enabling font loader: "
   flush stdout
-  if {![bl_write_eep $ofd $name2addr(FONT_LOADER_ON_ADDR) 1]} {
+  if {![bl_write_eep $ofd $name2addr(FONT_LOADER_ON) 1]} {
    my_error "write to eeprom failed"
   }
   puts done.
@@ -712,7 +712,7 @@ if {$op eq "writefont"} {
   puts -nonewline "Disabling font loader: "
   flush stdout
   set ofd [bl_connect]
-  bl_write_eep $ofd $name2addr(FONT_LOADER_ON_ADDR) 0
+  bl_write_eep $ofd $name2addr(FONT_LOADER_ON) 0
   bl_exit $ofd
   puts done.
  }
