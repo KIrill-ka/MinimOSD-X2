@@ -119,7 +119,7 @@ void setup()
     digitalWrite(10,  HIGH); // unplug USB HOST: ArduCam Only
 #endif
     // Prepare OSD for displaying 
-    osd.init();
+    osd.init((osd_statf & NEW_CFG_F) != 0);
 
     // Start 
     startPanels();

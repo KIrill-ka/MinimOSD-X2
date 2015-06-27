@@ -80,7 +80,7 @@ class OSD: public BetterStream
 {
   public:
     OSD(void);
-    void init(void);
+    void init(bool new_cfg);
     void clear(void);
     void plug(void);
     void setPanel(uint8_t start_col, uint8_t start_row);

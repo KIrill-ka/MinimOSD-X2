@@ -20,7 +20,7 @@ OSD::OSD()
 
 //------------------ init ---------------------------------------------------
 
-void OSD::init()
+void OSD::init(bool new_cfg)
 {
   uint8_t offset;
 
@@ -49,16 +49,18 @@ void OSD::init()
   // making sure the Max7456 is enabled
   control(1);
 
-  offset = EEPROM.read(VOFFSET_ADDR);
-  PORTD &= ~_BV(PD6);
-  Spi.transfer(MAX7456_VOS_reg); // 5 valid bits
-  Spi.transfer(offset);
-  PORTD |= _BV(PD6);
-  offset = EEPROM.read(HOFFSET_ADDR);
-  PORTD &= ~_BV(PD6);
-  Spi.transfer(MAX7456_HOS_reg); // 6 valid bits
-  Spi.transfer(offset);
-  PORTD |= _BV(PD6);
+  if(new_cfg) {
+   offset = EEPROM.read(VOFFSET_ADDR);
+   PORTD &= ~_BV(PD6);
+   Spi.transfer(MAX7456_VOS_reg); // 5 valid bits
+   Spi.transfer(offset);
+   PORTD |= _BV(PD6);
+   offset = EEPROM.read(HOFFSET_ADDR);
+   PORTD &= ~_BV(PD6);
+   Spi.transfer(MAX7456_HOS_reg); // 6 valid bits
+   Spi.transfer(offset);
+   PORTD |= _BV(PD6);
+  }
   memset(osdbuf, ' ', sizeof(osdbuf));
 }
 
