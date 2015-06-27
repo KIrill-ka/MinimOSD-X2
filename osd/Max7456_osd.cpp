@@ -61,7 +61,8 @@ void OSD::init(bool new_cfg)
    Spi.transfer(offset);
    PORTD |= _BV(PD6);
   }
-  memset(osdbuf, ' ', sizeof(osdbuf));
+  memset(osdbuf, ' ', sizeof(osdbuf)-1);
+  osdbuf[sizeof(osdbuf)-1] = MAX7456_END_string;
 }
 
 //------------------ Detect Mode (PAL/NTSC) ---------------------------------
@@ -199,17 +200,22 @@ OSD::write(uint8_t c){
   if(c == '|'){
    row++;
    bufpos = row*30+col;
-  } else
-   osdbuf[bufpos++] = c;
+  } else {
+   uint16_t bp = bufpos;
+   if(bp < 30*16) {
+    osdbuf[bp] = c;
+    bufpos = bp+1;
+   }
+  }
   return 1;
 }
 
 void
 OSD::update() {
  uint8_t *b;
- uint8_t *end_b;
+ uint8_t ch;
+
  b = osdbuf;
- end_b = b+sizeof(osdbuf);
 
  PORTD &= ~_BV(PD6);
  Spi.transfer(MAX7456_DMAH_reg);
@@ -220,16 +226,18 @@ OSD::update() {
  Spi.transfer(1);
  PORTD |= _BV(PD6);
 
- for(; b < end_b; b++) {
+ ch = *b; *b = ' '; b++;
+ while(1) {
   PORTD &= ~_BV(PD6);
-  SPDR = *b;
+  SPDR = ch;
+  if(ch == MAX7456_END_string) break;
+  ch = *b; *b = ' '; b++;
   while (!(SPSR & (1<<SPIF))) ;
   PORTD |= _BV(PD6);
  }
- PORTD &= ~_BV(PD6);
- Spi.transfer(MAX7456_END_string);
+ while (!(SPSR & (1<<SPIF))) ;
  PORTD |= _BV(PD6);
- memset(osdbuf, ' ', sizeof(osdbuf));
+ //memset(osdbuf, ' ', sizeof(osdbuf));
 }
 
 uint8_t OSD::checkVsync() {

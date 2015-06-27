@@ -104,7 +104,7 @@ class OSD: public BetterStream
     void write_NVM(int font_count, uint8_t *character_bitmap);
   private:
     uint8_t col, row, video_mode, video_center;
-    uint8_t osdbuf[16*30];
+    uint8_t osdbuf[16*30+1];
     uint16_t bufpos;
 };
 
