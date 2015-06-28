@@ -17,6 +17,7 @@ if {$tcl_platform(platform) eq "unix"} {
 
 set eeprom_version 4
 set npanels 3
+set fw_version "0.5.0"
 
 array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
@@ -94,7 +95,7 @@ SIGN_MSL_ON 1
 SIGN_HA_ON 1
 SIGN_GS_ON 1
 SIGN_AS_ON 1
-AUTO_SCREEN_SWITCH 1
+AUTO_SCREEN_SWITCH 4
 BATT_SHOW_PERCENT 0
 measure 0
 overspeed 100
@@ -116,9 +117,28 @@ HOFFSET 0
 MAV_BAUD 57
 }
 
-# set write_ignore_vars {
-#  EEPROM_OLD_VER EEPROM_NEW_VER 
-# }
+set write_ignore_vars {
+  EEPROM_OLD_VER EEPROM_NEW_VER  FW_VERSION1 FW_VERSION2 FW_VERSION3
+}
+
+set cfg_new_vars {
+ VOFFSET HOFFSET MAV_BAUD
+ MOTOR_WARN_CURR MOTOR_WARN_THR
+ CamPos
+}
+
+proc cfg_var_valid {var {panel -1}} {
+ if {$::cfg_ver >= 4 && $::cfg_ver != 255} {return 1}
+ if {$panel == 2} {return 0}
+ if {[lsearch -exact $::cfg_new_vars $var] != -1} {return 0}
+ return 1
+}
+
+proc cfg_var_cvt {var val} {
+ if {$::cfg_ver >= 4 && $::cfg_ver != 255} {return $val}
+ if {$var eq "AUTO_SCREEN_SWITCH" && $val == 3} {return 4}
+ return $val
+}
 
 set ops {
  "write" "read" "mcm2fnt" "fnt2mcm" "writefont" "loadfw"
@@ -138,7 +158,7 @@ proc usage {code} {
 }
 
 proc my_error {msg} {
- puts stderr "minimosd_eep: error: $msg"
+ puts stderr "minimosd_cfg: error: $msg"
  exit 2
 }
 
@@ -300,6 +320,10 @@ proc dump_panel_cfg {fd var} {
  }
  puts -nonewline $fd "$en$var$sps"
  for {set panel 0} {$panel < $::npanels} {incr panel} {
+   if {![cfg_var_valid $var $panel]} {
+    puts -nonewline $fd "-   0   0"
+    continue
+   }
    set en [panel_var $panel $var en]
    set x [panel_var $panel $var x]
    set y [panel_var $panel $var y]
@@ -310,12 +334,16 @@ proc dump_panel_cfg {fd var} {
 }
 
 proc dump_var {fd var} {
-
  set sps ""
  for {set i [expr {25-[string length $var]}]} {$i != 0} {incr i -1} {
     append sps " "
  }
- puts $fd [format "%s%s %s" $var $sps [cfg_var $var]]
+ if {[cfg_var_valid $var]} {
+  set val [cfg_var_cvt $var [cfg_var $var]]
+ } else {
+  set val $::var_default($var)
+ }
+ puts $fd [format "%s%s %s" $var $sps $val]
 }
 
 array set plusminus {
@@ -371,6 +399,12 @@ if {$op eq "read"} {
   close $f
  }
 
+ set fw_ver [cfg_var FW_VERSION1].[cfg_var FW_VERSION2].[cfg_var FW_VERSION3]
+ if {$fw_ver ne $fw_version} {
+  puts stderr "minimosd_cfg: warning: firmware version $fw_ver doesn't match this utility ($fw_version)"
+  puts stderr "Please, upgrade minimosd_cfg to be sure settings are read correctly."
+ }
+ set cfg_ver [cfg_var EEPROM_NEW_VER]
 
  if {[info exists ofn]} {
   set ofd [open $ofn w]
@@ -418,7 +452,7 @@ if {$op eq "write"} {
   if {[string index [lindex $s 0] 0] eq "#"} continue
   if {[llength $s] == 0} continue
   if {[llength $s] == 2} {
-   #if {[lsearch -exact $write_ignore_vars [lindex $s 0]] != -1} continue
+   if {[lsearch -exact $write_ignore_vars [lindex $s 0]] != -1} continue
    set var [lindex $s 0]
    set_var $f $var  [lindex $s 1]
    set v_set($var) 1
@@ -461,6 +495,10 @@ if {$op eq "write"} {
    }
    set_var $f EEPROM_NEW_VER $eeprom_version
    set_var $f EEPROM_OLD_VER 76
+   set fw_ver [string map {. " "} $fw_version]
+   set_var $f FW_VERSION1 [lindex $fw_ver 0]
+   set_var $f FW_VERSION2 [lindex $fw_ver 1]
+   set_var $f FW_VERSION3 [lindex $fw_ver 2]
  }
  close $f
  if {$ifd ne "stdout"} {close $ifd}
