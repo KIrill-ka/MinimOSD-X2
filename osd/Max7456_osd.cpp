@@ -226,12 +226,12 @@ OSD::update() {
  Spi.transfer(1);
  PORTD |= _BV(PD6);
 
- ch = *b; *b = ' '; b++;
+ ch = *b;
  while(1) {
   PORTD &= ~_BV(PD6);
   SPDR = ch;
   if(ch == MAX7456_END_string) break;
-  ch = *b; *b = ' '; b++;
+  *b = ' '; b++; ch = *b;
   while (!(SPSR & (1<<SPIF))) ;
   PORTD |= _BV(PD6);
  }
