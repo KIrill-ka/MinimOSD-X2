@@ -12,7 +12,7 @@
 #define TXT_MODE_MANUAL "ручн"
 #define TXT_MODE_CIRCLE "круг"
 #define TXT_MODE_STABILIZE "стаб"
-#define TXT_MODE_TRAINING "трен"
+#define TXT_MODE_TRAINING "обуч"
 #define TXT_MODE_ACRO "акро"
 #define TXT_MODE_FBWA "углы"
 #define TXT_MODE_FBWB "выс."

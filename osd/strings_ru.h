@@ -12,7 +12,7 @@
 #define TXT_MODE_MANUAL "\x72\x75\x79\x6f"
 #define TXT_MODE_CIRCLE "\x6c\x72\x75\x64"
 #define TXT_MODE_STABILIZE "\x73\x74\x61\x62"
-#define TXT_MODE_TRAINING "\x74\x72\x66\x6f"
+#define TXT_MODE_TRAINING "\x70\x62\x75\x79"
 #define TXT_MODE_ACRO "\x61\x6c\x72\x70"
 #define TXT_MODE_FBWA "\x75\x64\x6d\x7d"
 #define TXT_MODE_FBWB "\x63\x7d\x73."
