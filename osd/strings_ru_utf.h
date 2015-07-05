@@ -19,9 +19,9 @@
 #define TXT_MODE_CRUISE "курс"
 #define TXT_MODE_AUTOTUNE "наст"
 #define TXT_MODE_AUTO "авто"
-#define TXT_MODE_RTL "взвр"
+#define TXT_MODE_RTL "возв"
 #define TXT_MODE_LOITER "точк"
-#define TXT_MODE_GUIDED "марш"
+#define TXT_MODE_GUIDED "мест"
 #define TXT_MODE_INITIALIZING "подг"
 
 #define CH_WP1 'П'

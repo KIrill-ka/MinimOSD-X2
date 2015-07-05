@@ -19,9 +19,9 @@
 #define TXT_MODE_CRUISE "\x6c\x75\x72\x73"
 #define TXT_MODE_AUTOTUNE "\x6f\x61\x73\x74"
 #define TXT_MODE_AUTO "\x61\x63\x74\x70"
-#define TXT_MODE_RTL "\x63\x69\x63\x72"
+#define TXT_MODE_RTL "\x63\x70\x69\x63"
 #define TXT_MODE_LOITER "\x74\x70\x79\x6c"
-#define TXT_MODE_GUIDED "\x6e\x61\x72\x7a"
+#define TXT_MODE_GUIDED "\x6e\x66\x73\x74"
 #define TXT_MODE_INITIALIZING "\x71\x70\x65\x64"
 
 #define CH_WP1 '\x50'
