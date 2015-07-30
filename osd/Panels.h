@@ -4,6 +4,7 @@ void check_warn();
 void check_rssi();
 void check_panel_switch(int8_t allow_autoswitch);
 
+//extern int8_t debug_r;
 
 void startPanels(){
     panLogo(); // Display our logo  
@@ -23,13 +24,16 @@ void writePanels()
 { 
   int8_t show_fdata;
   int8_t p;
+  uint32_t ms;
+
+  ms = millis();
   if (takeofftime == 1 && (osd_alt_to_home > 10 || osd_groundspeed > 1 || osd_throttle > 1 || osd_home_distance > 100)) {
-    landed = millis();
+    landed = ms;
   }
 
   //Flight summary panel
   //Only show flight summary 7 seconds after landing
-  if (millis()-7000 > landed) { 
+  if (ms-7000 > landed && ms > landed+7000) { 
    show_fdata = (osd_statf & FDATA_OFF_F) == 0 || panel == npanels;
   } else {
    osd_statf &= ~FDATA_OFF_F;
@@ -105,6 +109,8 @@ void writePanels()
       if(ISe(panel,DIST_BIT)) panDistance(panDistance_XY[0][panel], panDistance_XY[1][panel]);
       if(ISe(panel,CAM_POS_BIT)) panCamPos(panCameraPos_XY[0][panel], panCameraPos_XY[1][panel]);
       if(ISd(0,CALLSIGN_BIT)) panCALLSIGN(panCALLSIGN_XY[0][panel], panCALLSIGN_XY[1][panel]); //call sign even in off panel
+      osd.setPanel(13, 4);
+      //osd.printf_P(PSTR("=%i"), (int)debug_r);
     } else {
      /* show warnings even if screen is disabled */
      for(p = 0; p < npanels; p++)
@@ -606,7 +612,7 @@ void check_warn()
  if (rssi < rssi_warn_level && rssi != -99) wmask |= 16;
  if (osd_statf & WARN_MOTOR_F) wmask |= 32;
  else if (motor_warn) osd_statf |= WARN_MOTOR_F; // wait for 1 sec for ESC to react before displaying the alert 
- if(millis() > lastMAVBeat + 2200) wmask |= 64;
+ if(millis() > last_mav_data_ts + 2200) wmask |= 64;
 
  if(wmask == 0) warning = 0;
  else {

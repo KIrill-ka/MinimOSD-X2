@@ -9,11 +9,11 @@ if {[info exists env(HOME)]} {
 
 if {![info exists serial_port]} {set serial_port "/dev/ttyUSB0"}
 
-if {$tcl_platform(platform) eq "unix"} {
- set tmp_eep_file "/tmp/minim_osd_x2.eep"
-} else {
- set tmp_eep_file "$env(TEMP)/minim_osd_x2.eep"
-}
+#if {$tcl_platform(platform) eq "unix"} {
+# set tmp_eep_file "/tmp/minim_osd_x2.eep"
+#} else {
+# set tmp_eep_file "$env(TEMP)/minim_osd_x2.eep"
+#}
 
 set eeprom_version 4
 set npanels 3
@@ -127,6 +127,241 @@ set cfg_new_vars {
  CamPos
 }
 
+namespace eval mav {
+
+array set msg_info {
+ 74 {VFR_HUD 20 20}
+ 76 {COMMAND_LONG 33 152}
+  0 {HEARTBEAT 9 50}
+ 20 {PARAM_REQUEST_READ 20 214}
+ 22 {PARAM_VALUE 25 220}
+}
+
+
+proc crc_accumulate {sum data} {
+ set tmp [expr {($data ^ $sum) & 0xff}]
+ set tmp [expr {(($tmp<<4) ^ $tmp) & 0xff}]
+ return [expr {($sum>>8) ^ ($tmp<<8) ^ ($tmp<<3) ^ ($tmp>>4)}]
+}
+
+proc crc_calculate {b} {
+ binary scan $b cu* x
+ set sum 0xffff
+ foreach byte $x {
+  set sum [crc_accumulate $sum $byte]
+ }
+ return $sum
+}
+
+proc open_serial {path {baud 115200}} {
+ set ofd [open $path r+]
+ fconfigure $ofd -translation binary
+ fconfigure $ofd -buffering none
+ fconfigure $ofd -timeout 500
+ fconfigure $ofd -mode $baud,n,8,1
+ fconfigure $ofd -handshake none
+ return $ofd
+}
+
+proc close_serial {fd} {
+ close $fd
+}
+
+set my_sysid 253
+set my_compid 1
+
+
+# u8 magic u8 len u8 seq u8 sysid u8 compid u8 msgid
+#f7sccc{0 0 0 0 0 0 0} 12 7 94 0
+
+set seq 1
+proc send {ofd id buf} {
+ set len [lindex $mav::msg_info($id) 1]
+ set msg [binary format "cccccca*" 254 $len $mav::seq $mav::my_sysid $mav::my_compid $id $buf]
+ binary scan $msg "@1a*" csum_data
+ set cs [crc_calculate $csum_data]
+ set cs [crc_accumulate $cs [lindex $mav::msg_info($id) 2]]
+ puts -nonewline $ofd $msg
+ puts -nonewline $ofd [binary format "s" $cs]
+ #binary scan $msg cu* b1
+ #binary scan [binary format "s" $cs] cu* b2
+ #puts "$b1:$b2"
+ incr mav::seq
+}
+
+proc send_cmd {ofd dest_sys dest_comp cmd_id buf} {
+ set body [binary format "a28sccc" $buf $cmd_id $dest_sys $dest_comp 0]
+ send $ofd 76 $body
+}
+
+proc send_hb {ofd} {
+ set body [binary format "iccccc" 0 0 0 0 0 0]
+ send $ofd 0 $body
+}
+
+#proc send_paramreq {ofd dest_sys dest_comp idx name} {
+# set name [binary format "a*i4" $name {0 0 0 0}]
+# set body [binary format "scca16" $idx $dest_sys $dest_comp $name]
+# send $ofd 20 $body
+#}
+
+proc send_eeprom_read {ofd dest_sys dest_comp addr sz} {
+ set body [binary format "sc@27c" $addr $sz 0]
+ send_cmd $ofd $dest_sys $dest_comp 30401 $body
+}
+
+proc send_eeprom_write {ofd dest_sys dest_comp addr data} {
+ set sz  [string length $data]
+ if {$sz > 24} {error "send_eeprom_write: maximal chunk length is 24"}
+ set body [binary format "@27c@0scca*" 0 $addr $sz 0 $data]
+ send_cmd $ofd $dest_sys $dest_comp 30402 $body
+}
+
+proc check_head {b} {
+ set n [binary scan $b "cucucucucucu" magic len seq sysid compid msgid]
+ if {$n < 6} {return -1}
+ if {$magic != 254} {return 0}
+ if {![info exists mav::msg_info($msgid)]} {return 0}
+ if {[lindex $mav::msg_info($msgid) 1] != $len} {return 0} 
+ return 1
+}
+
+proc check_message {b} {
+ binary scan $b "cucucucucucu" magic len seq sysid compid msgid
+ if {[string length $b] < $len+6+2} {return -1}
+ set csum_off [expr {$len+6}]
+ set csum_data_len [expr {$len+5}]
+ binary scan $b @1a${csum_data_len}@${csum_off}su csum_data csum
+ set csum1 [crc_calculate $csum_data]
+ set csum_extra [lindex $mav::msg_info($msgid) 2]
+ set csum1 [crc_accumulate $csum1 $csum_extra]
+ if {$csum1 != $csum} {return 0}
+ return 1
+}
+
+proc skip_message {b} {
+ return {}
+}
+proc print_message {b} {
+ binary scan $b "cucucucucucu" magic len seq sysid compid msgid
+ puts "[lindex $mav::msg_info($msgid) 0] $sysid:$compid"
+}
+
+proc wait_for_msg {fd id {timeout -1}} {
+ set buf {}
+ if {$timeout < 0} {
+  set end 1e100
+ } else {
+  set end [expr {[clock milliseconds]+$timeout}]
+ }
+ while {[clock milliseconds] < $end} {
+  set c [read $fd 1]
+  set buf [binary format "a*a" $buf $c]
+  set cont 0
+  while {$buf ne "" && !$cont} {
+   binary scan $buf cu magic
+   set cont [check_head $buf] 
+   if {$cont > 0} {
+    set cont [check_message $buf]
+   }
+   if {!$cont} {
+    binary scan $buf @1a* buf
+    continue
+   }
+   if {$cont > 0} {
+    binary scan $buf "@5cu" id1
+    #print_message $buf
+    if {$id == $id1} {return $buf}
+    set buf [skip_message $buf]
+    set cont 0
+   }
+  }
+ }
+ return {}
+}
+}
+
+namespace eval osd {
+
+set sysid 97
+set compid 94
+
+proc detect {fd {timeout 10000}} {
+ set end [clock milliseconds]
+ incr end $timeout
+ while {1} {
+  set w [expr {$end - [clock milliseconds]}]
+  if {$w <= 0} {return 0}
+  mav::send_hb $fd
+  set hb [mav::wait_for_msg $fd 0 $w]
+  if {$hb eq {}} continue
+  binary scan $hb "@10cu" type
+  if {$type == 24} break
+ }
+ binary scan $hb "@3cucu" osd::sysid osd::compid
+ return 1
+}
+
+proc read_eeprom {fd addr len {timeout 1000}} {
+ set end [clock milliseconds]
+ incr end $timeout
+ while {1} {
+  set w [expr {($end - [clock milliseconds])/4}]
+  if {$w <= 0} {return {}}
+  mav::send_eeprom_read $fd $osd::sysid $osd::compid $addr $len
+  set repl [mav::wait_for_msg $fd 76 $w]
+  if {$repl ne {}} break
+ }
+ binary scan $repl "@10a$len" data
+ return $data
+}
+
+proc write_eeprom {fd addr data {verify 1} {timeout 1000}} {
+ set end [clock milliseconds]
+ incr end $timeout
+ while {1} {
+  mav::send_eeprom_write $fd $osd::sysid $osd::compid $addr $data
+  if {!$verify} {return 1}
+  set w [expr {$end - [clock milliseconds]}]
+  if {$w <= 0} {return 0}
+  set x [read_eeprom $fd $addr [string length $data] $w]
+  if {$x eq $data} {return 1}
+ }
+}
+
+proc read_eeprom_all {fd {timeout 1000}} {
+ set buf {}
+ for {set i 0} {$i < 1024} {incr i 24} {
+  set rl [expr {1024-$i >= 24 ? 24 : 1024-$i}]
+  set x [read_eeprom $fd $i $rl $timeout]
+  if {$x eq {}} {return {}}
+  append buf $x
+ }
+ return $buf
+}
+
+proc write_eeprom_all {fd data {verify 1} {timeout 1000}} {
+ for {set i 0} {$i < 1024} {incr i 24} {
+  set rl [expr {1024-$i >= 24 ? 24 : 1024-$i}]
+  binary scan $data "@${i}a${rl}" blk
+  if {![write_eeprom $fd $i $blk $verify $timeout]} {return 0}
+ }
+ return 1
+}
+
+proc test {} {
+set fd [mav::open_serial "/dev/ttyACM0"]
+osd::detect $fd
+puts "osd detected: ${osd::sysid}:${osd::compid}"
+set buf [osd::read_eeprom_all $fd 2000]
+binary scan $buf "H*" x
+puts $x
+set r [osd::write_eeprom_all $fd $buf 1 2000]
+puts "write eeprom: $r"
+}
+  
+}
+
 proc cfg_var_valid {var {panel -1}} {
  if {$::cfg_ver >= 4 && $::cfg_ver != 255} {return 1}
  if {$panel == 2} {return 0}
@@ -164,6 +399,7 @@ proc my_error {msg} {
 
 set op ""
 set noclear 0
+set mav_config 0
 
 for {set i 0} {$i < [llength $argv]} {incr i} {
  switch [lindex $argv $i] {
@@ -174,6 +410,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-fnt" {incr i; set fnt_file [lindex $argv $i]}
   "-fw" {incr i; set fwfn [lindex $argv $i]}
   "-noclear" {set noclear 1}
+  "-mav" {set mav_config 1}
   "help" {usage 0}
   "write" -
   "read" -
@@ -269,16 +506,13 @@ array set special_set {
 proc read_callsign {var} {
   set addr $::name2addr($var)
   binary scan $::eep @${addr}a8 val
-  return [string trimright $val "\xff"]
+  return [string trimright $val "\xff\x00"]
 }
 
 proc write_callsign {fd var val} {
  set addr $::name2addr($var)
- seek $fd $addr start
- puts -nonewline $fd [binary format a* $val]
- for {set i [string length $val]} {$i < 8} {incr i} {
-  puts -nonewline $fd [binary format c 255]
- }
+ set val [binary format @7c@0a* 0 $val]
+ $::write_var $fd $addr $val
 }
 
 proc read_vhoffset {var} {
@@ -290,13 +524,12 @@ proc read_vhoffset {var} {
 
 proc write_vhoffset {fd var val} {
    set addr $::name2addr($var)
-   seek $fd $addr start
    if {$var eq "HOFFSET"} {
     set val [expr {($val+32) & 0x3f}]
    } else {
     set val [expr {($val+16) & 0x1f}]
    }
-   puts -nonewline $fd [binary format c $val]
+   $::write_var $fd $addr [binary format c $val]
 }
 
 proc cfg_var {var} {
@@ -351,6 +584,37 @@ array set plusminus {
  - 0
 }
 
+proc write_var_file {f addr val} {
+ seek $f $addr start
+ puts -nonewline $f [binary format "a*" $val]
+}
+
+proc write_var_buf {f addr val} {
+ set ::eep [binary format "a*@${addr}a*" $::eep $val]
+}
+
+proc write_var_bl {f addr val} {
+ binary scan $val cu* v
+ if {![bl_write_eep $f $addr $v 1]} {
+  my_error "write to eeprom @$addr failed"
+ }
+}
+
+proc write_var_mav {f addr val} {
+ if {![osd::write_eeprom $f $addr 1 2000]} {
+  my_error "write to eeprom @$addr failed"
+ }
+}
+
+proc bl_write_eep_all {fd eep} {
+  for {set a 0} {$a < 1024} {incr a 128} {
+   binary scan $eep @{a}cu128 blkl
+   if {![bl_write_eep $bl_fd $a $blkl 1]} {
+    my_error "eeprom write failed at @$a"
+   }
+  }
+}
+
 proc set_var {f var val} {
  if {[info exists ::special_set($var)]} {
    $::special_set($var) $f $var $val
@@ -358,24 +622,25 @@ proc set_var {f var val} {
  }
  set addr $::name2addr($var)
  #puts "normal var $addr $val"
- seek $f $addr start
- puts -nonewline $f [binary format c $val]
+ $::write_var $f $addr [binary format c $val]
 }
 
 proc set_panel_var {f p var suffix val} {
  set addr $::name2addr(${var}_${suffix})
  set addr [expr {$addr + $p*250}]
  #puts "panel var $addr $val [format %02X $val]"
- seek $f $addr start
- puts -nonewline $f [binary format c $val]
+ $::write_var $f $addr [binary format c $val]
 }
 
-if {![info exists fn]} {
-  set fn $tmp_eep_file
-  set call_avrdude 1
+if {[info exists fn]} {
+  set eeprom_access file
+} elseif {$mav_config} {
+  set eeprom_access mav
 } else {
-  set call_avrdude 0
+  set eeprom_access bl
 }
+
+puts $eeprom_access
 
 proc read_eeprom {} {
  #exec -ignorestderr avrdude -patmega328p -carduino -P $::serial_port -b57600 -D -U "eeprom:r:$fn:r"
@@ -390,8 +655,12 @@ proc read_eeprom {} {
 
 if {$op eq "read"} {
  
- if {$call_avrdude} {
+ if {$eeprom_access eq "bl"} {
   set eep [read_eeprom]
+ } elseif {$eeprom_access eq "mav"} {
+  set fd [mav::open_serial $::serial_port]
+  set eep [osd::read_eeprom_all $fd 2000]
+  close $fd
  } else {
   set f [open $fn r]
   fconfigure $f -translation binary
@@ -420,32 +689,35 @@ if {$op eq "read"} {
   foreach i [lsort [array names name2addr]] {
    if {$name2addr($i) < 250} continue
    dump_var $ofd $i
- }
+  }
  if {$ofd ne "stdout"} {close $ofd}
 }
-
 
 if {$op eq "write"} {
  if {[info exists ofn]} {
   set ifd [open $ofn r]
  } else {
-  set ifd stdout
+  set ifd stdin
  }
  if {$noclear} {
-  if {$call_avrdude} {read_eeprom $fn}
-  set mode r+
- } else {
-  set mode w
- }
- set f [open $fn $mode]
- fconfigure $f -translation binary
- if {!$noclear} {
-  set eep ""
-  set ff [binary format c 0xff]
-  for {set i 0} {$i < 1024} {incr i} {
-   append eep $ff
+  if {$eeprom_access eq "bl"} {
+   set write_var write_var_bl
+   set f [bl_connect]
+   set close_eep_fd bl_exit
+  } elseif {$eeprom_access eq "mav"} {
+   set write_var write_var_mav
+   set f [mav::open_serial $::serial_port]
+   set close_eep_fd mav::close_serial
+  } else {
+   set write_var write_var_file
+   set f [open $fn r+]
+   fconfigure $f -translation binary
+   set close_eep_fd close
   }
-  puts -nonewline $f $eep
+ } else {
+  set write_var write_var_buf
+  set eep [binary format @1023c 0]
+  set f {}
  }
  while {![eof $ifd]} {
   set s [gets $ifd]
@@ -479,6 +751,7 @@ if {$op eq "write"} {
   }
   my_error "unexpected config string: $s"
  }
+ if {$ifd ne "stdin"} {close $ifd}
  if {!$noclear} {
    # set defaults
    foreach i [array names name2addr] {
@@ -487,7 +760,7 @@ if {$op eq "write"} {
      # disable all panel displays by default
      set var [string range $i 0 end-3]
      for {set p 0} {$p < $npanels} {incr p} {
-      set_panel_var $f $p $var 0
+      set_panel_var $f $p $var en 0
      }
     } elseif {[info exists var_default($i)]} {
      set_var $f $i $var_default($i)
@@ -499,23 +772,22 @@ if {$op eq "write"} {
    set_var $f FW_VERSION1 [lindex $fw_ver 0]
    set_var $f FW_VERSION2 [lindex $fw_ver 1]
    set_var $f FW_VERSION3 [lindex $fw_ver 2]
- }
- close $f
- if {$ifd ne "stdout"} {close $ifd}
- if {$call_avrdude} {
-  #exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "eeprom:w:$fn:r"
-  set bl_fd [bl_connect]
-  set f [open $fn r]
-  fconfigure $f -translation binary
-  for {set a 0} {$a < 1024} {incr a 128} {
-   set blk [read $f 128]
-   binary scan $blk cu* blkl
-   if {![bl_write_eep $bl_fd $a $blkl 1]} {
-    my_error "eeprom write failed at @$a"
+   if {$eeprom_access eq "bl"} {
+    set bl_fd [bl_connect]
+    bl_write_eep_all $bl_fd $eep
+    bl_exit $bl_fd
+   } elseif {$eeprom_access eq "file"} {
+    set f [open $fn w]
+    fconfigure $f -translation binary
+    puts -nonewline $f $eep
+    close $f
+   } else {
+    set f [mav::open_serial $::serial_port]
+    osd::write_eeprom_all $f $eep 1 2000
+    mav::close_serial $f
    }
-  }
-  close $f
-  bl_exit $bl_fd
+ } else {
+   $close_eep_fd $f
  }
 }
 

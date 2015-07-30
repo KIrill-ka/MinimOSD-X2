@@ -206,7 +206,7 @@ void readSettings()
     int i;
     for(i=0; i < OSD_CALL_SIGN_TOTAL; i++) {
         char_call[i] = EEPROM.read(OSD_CALL_SIGN_ADDR + i);
-        if(char_call[i] == 0) break;
+        if(char_call[i] == 0 || char_call[i] == 0xff) break;
     }
     char_call[i] ='\0'; // null terminate the string 
     if(osd_statf & NEW_CFG_F) {
