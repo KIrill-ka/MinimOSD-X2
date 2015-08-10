@@ -1,3 +1,4 @@
+#include <avr/wdt.h>
 #include "../GCS_MAVLink/include/mavlink/v1.0/mavlink_types.h"
 #include "../GCS_MAVLink/include/mavlink/v1.0/ardupilotmega/mavlink.h"
 
@@ -16,9 +17,6 @@ static void process_command(mavlink_message_t *msg)
 {
  mavlink_command_long_t *c;
  uint8_t *pdata;
- uint8_t i;
- uint8_t *addr, *buf;
- uint8_t len;
                  
  pdata = (uint8_t*)_MAV_PAYLOAD_NON_CONST(msg);
  c = (mavlink_command_long_t*)pdata;
@@ -26,27 +24,12 @@ static void process_command(mavlink_message_t *msg)
  if(c->target_system != mavlink_system.sysid
        || c->target_component != mavlink_system.compid) return;
  switch(c->command) {
-         case 30400: /* reboot */
+         case 246: 
+                 cli();
+                 /*wdt_enable(WDTO_15MS);
+                 while(1);*/
+                 asm volatile ("jmp 0x7800");
                  break;
-         case 30401: /* read eeprom */
-         case 30402: /* write eeprom */
-                 {
-                  addr = (uint8_t*)*(uint16_t*)pdata;
-                  len = *(uint8_t*)(pdata+2);
-                  buf = pdata+4; /* 6 floats = 24 bytes */
-                  if(len > 24) break;
-                  if(c->command == 30401) {
-                   for(i = 0; i < len; i++) 
-                    buf[i] = eeprom_read_byte(addr+i);
-                   c->command = 30403;
-                   c->target_component = msg->compid;
-                   c->target_system = msg->sysid;
-                   _mav_finalize_message_chan_send(MAVLINK_COMM_0, MAVLINK_MSG_ID_COMMAND_LONG, (const char *)c, MAVLINK_MSG_ID_COMMAND_LONG_LEN, 152);
-                  } else {
-                   for(i = 0; i < len; i++) 
-                    eeprom_write_byte(addr+i, buf[i]);
-                  }
-                 }
  }
 }
 

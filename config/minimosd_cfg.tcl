@@ -6,7 +6,6 @@ if {[info exists env(HOME)]} {
  }
 }
 
-if {![info exists serial_port]} {set serial_port "/dev/ttyUSB0"}
 
 set eeprom_version 4
 set npanels 3
@@ -134,7 +133,7 @@ proc cfg_var_cvt {var val} {
 }
 
 set ops {
- "write" "read" "mcm2fnt" "fnt2mcm" "writefont" "loadfw"
+ "write" "read" "mcm2fnt" "fnt2mcm" "writefont" "writefw"
 }
 
 proc usage {code} {
@@ -146,7 +145,7 @@ proc usage {code} {
  puts $f "\t$me mcm2fnt \[-mcm <mcm_file>] \[-fnt <fnt_file>]"
  puts $f "\t$me fnt2mcm \[-mcm <mcm_file>] \[-fnt <fnt_file>]"
  puts $f "\t$me writefont \[-P <serial_port>] \[{-mcm <mcm_file> | -fnt <fnt_file>}]"
- puts $f "\t$me loadfw \[-P <serial_port>] -fw <hex_file>"
+ puts $f "\t$me writefw \[-P <serial_port>] -fw <hex_file>"
  exit $code
 }
 
@@ -158,6 +157,9 @@ proc my_error {msg} {
 set op ""
 set noclear 0
 set mav_config 0
+set mav_baud 57600 
+set mav_dev 0
+set verbose 0
 
 for {set i 0} {$i < [llength $argv]} {incr i} {
  switch [lindex $argv $i] {
@@ -168,18 +170,32 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-fnt" {incr i; set fnt_file [lindex $argv $i]}
   "-fw" {incr i; set fwfn [lindex $argv $i]}
   "-noclear" {set noclear 1}
+  "-verbose" {set verbose 1; set mav::verbose 1}
   "-mav" {set mav_config 1}
+  "-mav_baud" {incr i; set mav_baud [lindex $argv $i]}
+  "-mav_dev" {incr i; set mav_dev [lindex $argv $i]}
   "help" {usage 0}
   "write" -
   "read" -
   "mcm2fnt" -
   "fnt2mcm" -
   "writefont" -
-  "loadfw" {set op [lindex $argv $i]}
+  "writefw" {set op [lindex $argv $i]}
+  default {
+   my_error "unknown option [lindex $argv $i]"
+  }
  }
 }
 
 if {$op eq ""} {usage 1}
+
+if {![info exists serial_port]} {
+ if {$mav_config} {
+  set serial_port "/dev/ttyACM0"
+ } else {
+  set serial_port "/dev/ttyUSB0"
+ }
+}
 
 proc bl_connect {} {
  set ofd [open $::serial_port r+]
@@ -195,7 +211,19 @@ proc bl_connect {} {
  return $ofd
 }
 
-proc bl_read_eep {ofd addr n} {
+proc bl_cmd_serial {fd data resp_len} {
+  puts -nonewline $fd $data
+  if {$resp_len == 0} {return {}}
+  return [read $fd $resp_len]
+}
+
+array set mem2cmd {
+ EEPROM E
+ FLASH F
+}
+
+proc bl_read_mem1 {ofd memtype addr len} {
+ set n $len
  if {$addr & 1} {
   incr n
   set trim 2
@@ -203,45 +231,133 @@ proc bl_read_eep {ofd addr n} {
   set trim 1
  }
  set addr [expr {$addr/2}]
- puts -nonewline $ofd [binary format "asa" U $addr " "]
- binary scan [read $ofd 2] "H*" resp
- if {$resp ne "1410"} {return {}}
- puts -nonewline $ofd [binary format "aSaa" t $n E " "]
- binary scan [read $ofd [expr {$n+2}]] "cu*" resp
- 
- if {[lindex $resp 0] != 0x14} {return {}}
- if {[lindex $resp [expr {$n+1}]] != 0x10} {return {}}
- 
- return [lrange $resp $trim end-1]
+ set resp [$::bl_cmd $ofd [binary format "asa" U $addr " "] 2]
+ binary scan $resp "H*" r
+ if {$r ne "1410"} {
+  verbose_msg "bootloader: reading $memtype @$addr: bad responce for address set command ($r)"
+  return {}
+ }
+ set resp [$::bl_cmd $ofd [binary format "aSaa" t $n $::mem2cmd($memtype) " "] [expr {$n+2}]]
+#puts "got [string length $resp] bytes"
+#binary scan $resp H* xx
+#puts $xx
+ set nf [binary scan $resp "H2@${trim}a${len}H2" r14 data r10]
+ if {$nf != 3} {
+  if {$nf == 0} {
+   verbose_msg "bootloader: reading $memtype @$addr: no response"
+  } else {
+   set last_b [string length $resp]
+   incr last_b -1
+   binary scan $resp "@${last_b}H2" r10
+   verbose_msg "bootloader: reading $memtype @$addr: bad length [string length $resp], $n+2 expected, header=$r14, trailer=$r10"
+  }
+  return {}
+ }
+ if {$r14 ne "14" || $r10 ne "10"} {
+  verbose_msg "bootloader: reading $memtype bad responce: header $r14 trailer $r10" 
+  return {}
+ }
+ return $data
 }
 
-proc bl_write_eep {ofd addr values {verify 0}} {
+proc bl_read_mem {ofd t addr len} {
+ for {set i 0} {$i < 5} {incr i} {
+  set r [bl_read_mem1 $ofd $t $addr $len]
+  if {$r ne {}} {return $r}
+ }
+ return {}
+}
+
+proc bl_read_eep_num {ofd addr} {
+ set r [bl_read_mem $ofd EEPROM $addr 1]
+ if {$r eq {}} {return $r}
+ binary scan $r cu ret
+ return $ret
+}
+
+proc bl_write_mem {ofd memtype addr data {verify 0}} {
  if {$addr & 1} {
-  set b [bl_read_eep $ofd [expr {$addr-1}] 1]
+  if {$memtype eq "FLASH"} {
+   error "can't write to odd FLASH address"
+  }
+  set b [bl_read_mem $ofd $memtype [expr {$addr-1}] 1]
   if {$b eq ""} {return 0}
-  set values [concat $b $values]
+  set data [binary format aa* $b $data]
  }
  set addr [expr {$addr/2}]
- set n [llength $values]
- puts -nonewline $ofd [binary format "asa" U $addr " "]
- binary scan [read $ofd 2] "H*" resp
- if {$resp ne "1410"} {return 0}
- puts -nonewline $ofd [binary format "aSac*a" d $n E $values " "]
- binary scan [read $ofd 2] "H*" resp
- if {$resp ne "1410"} {return 0}
- if {$verify} {
-  set v [bl_read_eep $ofd [expr {$addr*2}] $n]
-  foreach i $values j $v {
-   if {$i != $j} {puts "verify failed"; return 0}
-  }
+ set n [string length $data]
+ set resp [$::bl_cmd $ofd [binary format "asa" U $addr " "] 2]
+ binary scan $resp "H*" r
+ if {$r ne "1410"} {
+  verbose_msg "bootloader: $memtype address set error"
+  return 0
  }
-
+ set resp [$::bl_cmd $ofd [binary format "aSaa*a" d $n $::mem2cmd($memtype) $data " "] 2]
+ binary scan $resp "H*" r
+ if {$r ne "1410"} {
+  verbose_msg "bootloader: $memtype write error: response=\"$r\" len=$n datalen=[string length $data]"
+  return 0
+ }
+ if {$verify} {
+  set v [bl_read_mem $ofd $memtype [expr {$addr*2}] $n]
+  if {$v ne $data} {verbose_msg "bootloader: verify failed after $memtype write"; return 0}
+ }
  return 1
 }
 
-proc bl_exit {ofd} {
- puts -nonewline $ofd j
- close $ofd
+proc bl_write_eep_num {fd addr byte {verify 0}} {
+ set d [binary format c $byte]
+ return [bl_write_mem $fd EEPROM $addr $d $verify
+}
+
+proc bl_write_flash_page {fd addr data} {
+ if {[string length $data] != 128} {
+  error "bl_write_flash_page: wrong data size [string length $data]"
+ }
+ if {($addr % 128) != 0} {
+  error "bl_write_flash_page: address is not on page boundary $addr"
+ }
+ return [bl_write_mem $fd FLASH $addr $d 1]
+}
+
+proc bl_write_bl_jump {fd} {
+ set jump_page [binary format @127cH8 0 0C94003C]
+ return [bl_write_flash_page $fd 0 $jump_page]
+}
+
+proc ihex_read {fname} {
+
+}
+
+proc bl_exit {fd} {
+ # send some trash to force application start
+ $::bl_cmd $fd [binary format a10 ??????????] 0
+
+ if {$::eeprom_access eq "bl"} {
+  bl_cmd_serial $fd "j" 0
+  close $fd
+ } else {
+  osd::bl_exit $fd
+  mav::close_serial $fd
+ }
+}
+
+proc verbose_msg {m} {
+ if {!$::verbose} return
+ puts $m
+}
+
+proc bl_check_sig {fd} {
+ for {set i 0} {$i < 5} {incr i} {
+  set resp [$::bl_cmd $fd [binary format "aa" u " "] 5]
+  if {[binary scan $resp "H10" r] == 1} { 
+   if {$r eq "141e950f10"} {return 1}
+   binary scan $resp H* rr
+   verbose_msg "bootloader: device signature doesn't match (got $rr)"
+  }
+  after 50
+ }
+ return 0
 }
 
 proc panel_var {panel var suffix} {
@@ -352,25 +468,19 @@ proc write_var_buf {f addr val} {
 }
 
 proc write_var_bl {f addr val} {
- binary scan $val cu* v
- if {![bl_write_eep $f $addr $v 1]} {
-  my_error "write to eeprom @$addr failed"
- }
-}
-
-proc write_var_mav {f addr val} {
- if {![osd::write_eeprom $f $addr 1 2000]} {
+ if {![bl_write_mem $f EEPROM $addr $val 1]} {
   my_error "write to eeprom @$addr failed"
  }
 }
 
 proc bl_write_eep_all {fd eep} {
-  for {set a 0} {$a < 1024} {incr a 128} {
-   binary scan $eep @{a}cu128 blkl
-   if {![bl_write_eep $bl_fd $a $blkl 1]} {
-    my_error "eeprom write failed at @$a"
+  for {set a 0} {$a < 1024} {incr a 64} {
+   binary scan $eep @${a}a64 blkl
+   if {![bl_write_mem $fd EEPROM $a $blkl 1]} {
+    return 0
    }
   }
+  return 1
 }
 
 proc set_var {f var val} {
@@ -398,32 +508,55 @@ if {[info exists fn]} {
   set eeprom_access bl
 }
 
-puts $eeprom_access
-
-proc read_eeprom {} {
- #exec -ignorestderr avrdude -patmega328p -carduino -P $::serial_port -b57600 -D -U "eeprom:r:$fn:r"
- set fd [bl_connect]
- set e [bl_read_eep $fd 0 1024]
- bl_exit $fd
- if {[llength $e] != 1024} {
-  my_error "failed to read eeprom"
+proc read_eeprom {fd} {
+ set retry 0
+ set ret {}
+ for {set a 0} {$a < 1024} {incr a 64} {
+  set r [bl_read_mem $fd EEPROM $a 64]
+  if {$r eq {}} {
+   if {$retry == 10} {return {}}
+   incr retry
+   verbose_msg "bootloader: retry eeprom read from $a"
+   incr a -64
+  } else {
+   append ret $r
+  }
  }
- return [binary format c* $e]
+ return $ret
+}
+
+proc bl_open_mav {timeout {min_timeout 20}} {
+ set ::bl_cmd osd::bl_cmd
+ set fd [mav::open_serial $::serial_port $::mav_baud]
+ osd::bl_config [list dev $::mav_dev baud 57600 timeout_max 500 timeout_min 20]
+ osd::reboot $fd
+ if {![bl_check_sig $fd]} {
+   osd::bl_exit $fd
+   my_error "failed to contact bootloader"
+ }
+ osd::bl_config [list dev $::mav_dev baud 57600 timeout_max $timeout timeout_min $min_timeout]
+ return $fd
 }
 
 if {$op eq "read"} {
  
  if {$eeprom_access eq "bl"} {
-  set eep [read_eeprom]
+  set bl_cmd bl_cmd_serial
+  set fd [bl_connect]
+  set eep [read_eeprom $fd]
+  bl_exit $fd
  } elseif {$eeprom_access eq "mav"} {
-  set fd [mav::open_serial $::serial_port]
-  set eep [osd::read_eeprom_all $fd 2000]
-  close $fd
+  set fd [bl_open_mav 250]
+  set eep [read_eeprom $fd]
+  bl_exit $fd
  } else {
   set f [open $fn r]
   fconfigure $f -translation binary
   set eep [read $f 1024]
   close $f
+ }
+ if {[string length $eep] != 1024} {
+  my_error "failed to read eeprom"
  }
 
  set fw_ver [cfg_var FW_VERSION1].[cfg_var FW_VERSION2].[cfg_var FW_VERSION3]
@@ -459,13 +592,14 @@ if {$op eq "write"} {
  }
  if {$noclear} {
   if {$eeprom_access eq "bl"} {
-   set write_var write_var_bl
+   set bl_cmd bl_cmd_serial
    set f [bl_connect]
    set close_eep_fd bl_exit
+   set write_var write_var_bl
   } elseif {$eeprom_access eq "mav"} {
-   set write_var write_var_mav
-   set f [mav::open_serial $::serial_port]
-   set close_eep_fd mav::close_serial
+   set f [bl_open_mav 1000 100]
+   set close_eep_fd bl_exit
+   set write_var write_var_bl
   } else {
    set write_var write_var_file
    set f [open $fn r+]
@@ -532,17 +666,23 @@ if {$op eq "write"} {
    set_var $f FW_VERSION3 [lindex $fw_ver 2]
    if {$eeprom_access eq "bl"} {
     set bl_fd [bl_connect]
-    bl_write_eep_all $bl_fd $eep
+    set r [bl_write_eep_all $bl_fd $eep]
     bl_exit $bl_fd
+    if {!$r} {
+     my_error "eeprom write failed"
+    }
+   } elseif {$eeprom_access eq "mav"} {
+    set bl_fd [bl_open_mav 1000 100]
+    set r [bl_write_eep_all $bl_fd $eep]
+    bl_exit $bl_fd
+    if {!$r} {
+     my_error "eeprom write failed"
+    }
    } elseif {$eeprom_access eq "file"} {
     set f [open $fn w]
     fconfigure $f -translation binary
     puts -nonewline $f $eep
     close $f
-   } else {
-    set f [mav::open_serial $::serial_port]
-    osd::write_eeprom_all $f $eep 1 2000
-    mav::close_serial $f
    }
  } else {
    $close_eep_fd $f
@@ -709,18 +849,18 @@ if {$op eq "writefont"} {
   set font_format "fnt"
  }
  set ofd [bl_connect]
- set fl_en [bl_read_eep $ofd $name2addr(FONT_LOADER_ON) 1]
+ set fl_en [bl_read_eep_num $ofd $name2addr(FONT_LOADER_ON)]
  if {$fl_en eq ""} {
   my_error "no response from bootloader"
  }
- set mav_baud [bl_read_eep $ofd $name2addr(MAV_BAUD) 1]
+ set mav_baud [bl_read_eep_num $ofd $name2addr(MAV_BAUD) 1]
  if {$fl_en eq ""} {
   my_error "no response from bootloader"
  }
  if {!$fl_en} {
   puts -nonewline "Enabling font loader: "
   flush stdout
-  if {![bl_write_eep $ofd $name2addr(FONT_LOADER_ON) 1]} {
+  if {![bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 1]} {
    my_error "write to eeprom failed"
   }
   puts done.
@@ -780,12 +920,12 @@ if {$op eq "writefont"} {
   puts -nonewline "Disabling font loader: "
   flush stdout
   set ofd [bl_connect]
-  bl_write_eep $ofd $name2addr(FONT_LOADER_ON) 0
+  bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 0
   bl_exit $ofd
   puts done.
  }
 }
 
-if {$op eq "loadfw"} {
+if {$op eq "writefw"} {
   exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
 }

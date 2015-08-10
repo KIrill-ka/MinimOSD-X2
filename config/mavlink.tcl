@@ -4,11 +4,14 @@ namespace eval mav {
 array set msg_info {
  74 {VFR_HUD 20 20}
  76 {COMMAND_LONG 33 152}
+ 77 {COMMAND_ACK 3 143}
   0 {HEARTBEAT 9 50}
  20 {PARAM_REQUEST_READ 20 214}
  22 {PARAM_VALUE 25 220}
+ 126 {SERIAL_CONTROL 79 220}
 }
 
+set verbose 0
 
 proc crc_accumulate {sum data} {
  set tmp [expr {($data ^ $sum) & 0xff}]
@@ -43,9 +46,6 @@ set my_sysid 253
 set my_compid 1
 
 
-# u8 magic u8 len u8 seq u8 sysid u8 compid u8 msgid
-#f7sccc{0 0 0 0 0 0 0} 12 7 94 0
-
 set seq 1
 proc send {ofd id buf} {
  set len [lindex $mav::msg_info($id) 1]
@@ -55,9 +55,6 @@ proc send {ofd id buf} {
  set cs [crc_accumulate $cs [lindex $mav::msg_info($id) 2]]
  puts -nonewline $ofd $msg
  puts -nonewline $ofd [binary format "s" $cs]
- #binary scan $msg cu* b1
- #binary scan [binary format "s" $cs] cu* b2
- #puts "$b1:$b2"
  incr mav::seq
 }
 
@@ -71,22 +68,30 @@ proc send_hb {ofd} {
  send $ofd 0 $body
 }
 
-#proc send_paramreq {ofd dest_sys dest_comp idx name} {
-# set name [binary format "a*i4" $name {0 0 0 0}]
-# set body [binary format "scca16" $idx $dest_sys $dest_comp $name]
-# send $ofd 20 $body
-#}
-
-proc send_eeprom_read {ofd dest_sys dest_comp addr sz} {
- set body [binary format "sc@27c" $addr $sz 0]
- send_cmd $ofd $dest_sys $dest_comp 30401 $body
+proc send_paramreq {ofd dest_sys dest_comp idx name} {
+ set name [binary format "a*i4" $name {0 0 0 0}]
+ set body [binary format "scca16" $idx $dest_sys $dest_comp $name]
+ send $ofd 20 $body
 }
 
-proc send_eeprom_write {ofd dest_sys dest_comp addr data} {
- set sz  [string length $data]
- if {$sz > 24} {error "send_eeprom_write: maximal chunk length is 24"}
- set body [binary format "@27c@0scca*" 0 $addr $sz 0 $data]
- send_cmd $ofd $dest_sys $dest_comp 30402 $body
+array set serial_flag {
+ REPLY 1
+ RESPOND 2
+ EXCLUSIVE 4
+ BLOCKING 8
+ MULTI 16
+}
+
+proc send_serial {ofd br timeout dev opts buf} {
+ set f 0
+ foreach o $opts {
+  set f [expr {$f | $mav::serial_flag($o)}]
+ }
+ set len [string length $buf]
+ set body [binary format "@78c@0isccca*" 0 $br $timeout $dev $f $len $buf]
+ send $ofd 126 $body
+#binary scan $body H* d
+#puts $d
 }
 
 proc check_head {b} {
@@ -107,7 +112,12 @@ proc check_message {b} {
  set csum1 [crc_calculate $csum_data]
  set csum_extra [lindex $mav::msg_info($msgid) 2]
  set csum1 [crc_accumulate $csum1 $csum_extra]
- if {$csum1 != $csum} {return 0}
+ if {$csum1 != $csum} {
+  if {$mav::verbose} {
+   puts "mavlink: bad checksum for $msgid"
+  }
+  return 0
+ }
  return 1
 }
 
