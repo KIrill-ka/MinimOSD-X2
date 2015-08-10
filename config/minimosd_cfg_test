@@ -1,0 +1,4 @@
+#!/usr/bin/tclsh
+source mavlink.tcl
+source mavlink_osd.tcl
+source minimosd_cfg.tcl
