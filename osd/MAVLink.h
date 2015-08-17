@@ -23,12 +23,16 @@ static void process_command(mavlink_message_t *msg)
 
  if(c->target_system != mavlink_system.sysid
        || c->target_component != mavlink_system.compid) return;
+
  switch(c->command) {
          case 246: 
+                 if((uint8_t)c->param3 == 1) {
+                  delay(1000);
+                  uploadFont();
+                  break;
+                 }
                  cli();
-                 /*wdt_enable(WDTO_15MS);
-                 while(1);*/
-                 asm volatile ("jmp 0x7800");
+                 asm volatile ("jmp 0x7800"); /* call bootloader */
                  break;
  }
 }
@@ -64,12 +68,14 @@ void read_mavlink()
             switch(msg.msgid) {
             case MAVLINK_MSG_ID_HEARTBEAT:
                 {
+                    uint8_t type = mavlink_msg_heartbeat_get_autopilot(&msg);
+                    if(type == MAV_TYPE_GCS || type == MAV_TYPE_ANTENNA_TRACKER) break;
+                    if(mavlink_system.sysid == 97) mavlink_system.sysid = msg.sysid;
                     osd_mode = (uint8_t)mavlink_msg_heartbeat_get_custom_mode(&msg);
                 }
                 break;
             case MAVLINK_MSG_ID_SYS_STATUS:
                 {
-
                     osd_vbat_A = (mavlink_msg_sys_status_get_voltage_battery(&msg) / 1000.0f); //Battery voltage, in millivolts (1 = 1 millivolt)
                     osd_curr_A = mavlink_msg_sys_status_get_current_battery(&msg); //Battery current, in 10*milliamperes (1 = 10 milliampere)         
                     osd_battery_remaining_A = mavlink_msg_sys_status_get_battery_remaining(&msg); //Remaining battery energy: (0%: 0, 100%: 100)
@@ -155,56 +161,6 @@ void read_mavlink()
                 new_data = 0;
                 process_command(&msg);
                 break;
-#if 0
-            case MAVLINK_MSG_ID_PARAM_REQUEST_READ:
-                new_data = 0;
-                {
-                 uint8_t i;
-                 mavlink_param_value_t *pval;
-                 mavlink_param_request_read_t *req;
-                 int16_t idx;
-                 uint8_t sz;
-                 req = (mavlink_param_request_read_t*)_MAV_PAYLOAD_NON_CONST(&msg);
-
-                 if(req->target_system != mavlink_system.sysid
-                                || req->target_component != mavlink_system.compid) break;
-                 idx = req->param_index;
-                 if(req->param_id[0] == 'R'
-                          && req->param_id[1] == 'A'
-                          && req->param_id[2] == 'W') {
-                  sz = (req->param_id[3]-'0')*10+(req->param_id[4]-'0');
-                  if(sz > 16) break;
-                 } else break;
-                 pval = (mavlink_param_value_t*)req;
-                 memset(pval, 0, sizeof(*pval));
-                 for(i = 0; i < sz; i++, idx++) 
-                   pval->param_id[i] = eeprom_read_byte((const uint8_t*)idx);
-                 pval->param_count = 1024; /* eeprom size */
-                 pval->param_index = idx;
-                 /* packet.param_type = MAVLINK_TYPE; */
-                 _mav_finalize_message_chan_send(MAVLINK_COMM_0, MAVLINK_MSG_ID_PARAM_VALUE, (const char *)pval, 25, 220);
-                }
-                break;
-            case MAVLINK_MSG_ID_PARAM_SET:
-                new_data = 0;
-                {
-                 uint8_t i;
-                 int16_t idx;
-                 uint8_t sz;
-                 mavlink_param_set_t *req;
-
-                 req = (mavlink_param_set_t*)_MAV_PAYLOAD_NON_CONST(&msg);
-
-                 if(req->target_system != mavlink_system.sysid
-                         || req->target_component != mavlink_system.compid) break;
-                  idx = req->param_value;
-                  sz = req->param_type;
-                  if(sz > 16 || sz == 0) break;
-                  for(i = 0; i < sz; i++, idx++) 
-                    eeprom_write_byte((uint8_t*)idx, req->param_id[i]);
-                 }
-                break;
-#endif
             default:
                 new_data = 0;
                 break;
