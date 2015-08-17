@@ -230,38 +230,30 @@ void panEff(int first_col, int first_line){
     float glide;
     osd.setPanel(first_col, first_line);
     if (osd_throttle >= 1){
-      if (ma == 0) {
-              ma = 1;
-            }
-        if (osd_groundspeed != 0) eff = (float(osd_curr_A * 10.0) / (osd_groundspeed * converts))* 0.1 + eff * 0.9;
-//        eff = eff * 0.2 + eff * 0.8;
-          if (eff > 0 && eff <= 9999) {
+        osd_statf1 |= EFF_RESET_GLIDE_F1;
+        if((osd_statf1 & TRIG100MS_F1) != 0 && osd_groundspeed != 0)
+          eff = (float(osd_curr_A * 10.0) / (osd_groundspeed * converts))* 0.1 + eff * 0.9;
+        if (eff > 0 && eff <= 9999) {
             osd.printf_P(PSTR("%c%4.0f%c"), 0x16, eff, 0x01);
-          }else{
-          osd.printf_P(PSTR("\x16"));
-          }
+        } else {
+           osd.printf_P(PSTR("\x16"));
+        }
           
-    }else{
+    } else {
          
-        if ((osd_throttle < 1)){
-            if (ma == 1) {
+            if (osd_statf1 & EFF_RESET_GLIDE_F1) {
               palt = osd_alt_to_home;
-//              descendt = millis();
               ddistance = tdistance;
-              ma = 0;
+              osd_statf1 &= ~EFF_RESET_GLIDE_F1;
             }
-          }
+
             if (osd_climb < -0.05){ 
-//            glide = ((osd_alt_to_home / (palt - osd_alt_to_home)) * ((millis() - descendt) / 1000)) * osd_groundspeed;
-            glide = ((osd_alt_to_home / (palt - osd_alt_to_home)) * (tdistance - ddistance)) * converth;
-            if (glide > 9999) glide = 9999;
-             if (glide > -0){
-            osd.printf_P(PSTR("%c%4.0f%c"), 0x18, glide, high);
-             }
-            }
-            else if (osd_climb >= -0.05 && osd_pitch < 0) {
+             glide = ((osd_alt_to_home / (palt - osd_alt_to_home)) * (tdistance - ddistance)) * converth;
+             if (glide > 9999) glide = 9999;
+             if (glide > -0) osd.printf_P(PSTR("%c%4.0f%c"), 0x18, glide, high);
+            } else if (osd_pitch < 0) {
               osd.printf_P(PSTR("\x18\x20\x20\x90\x91"));   
-            }else{
+            } else {
               osd.printf_P(PSTR("\x18")); 
             }
             
@@ -326,9 +318,14 @@ void panRSSI(int first_col, int first_line) {
 // Staus  : done
 
 void panCALLSIGN(int first_col, int first_line){
+    uint8_t i;
+    char ch;
     osd.setPanel(first_col, first_line);
-    if(((millis() / 1000) % 60) < 2){
-      osd.printf_P(PSTR("%s"), char_call);
+    if(((millis() / 1000) % 60) > 1) return;
+    for(i = 0; i < sizeof(char_call); i++) {
+     ch = char_call[i];
+     if(ch == 0 || ch == '\xff') break;
+     osd.write(ch);
     }
 }
 
@@ -540,7 +537,7 @@ void panAlt(int first_col, int first_line){
 void panClimb(int first_col, int first_line) {
     int vs_int;
     osd.setPanel(first_col, first_line);
-    vs = (osd_climb * converth * 6) * 0.1 + vs * 0.9; // result is 10m/min or 10ft/min
+    if(osd_statf1 & TRIG100MS_F1) vs = (osd_climb * converth * 6) * 0.1 + vs * 0.9; // result is 10m/min or 10ft/min
     vs_int = (int)vs*10;
     osd.printf_P(PSTR("%c%3i%c"), vs_int >= 0 ? 0x15 : 0x0a, abs(vs_int), climbchar);
 }
@@ -601,8 +598,7 @@ void check_warn()
 
  if((osd_statf & WARN_MOTOR_F) != 0 && !motor_warn) osd_statf &= ~WARN_MOTOR_F;
 
- if (!(osd_statf & WARN_CHECK_F)) return;
- osd_statf &= ~WARN_CHECK_F;
+ if (!(osd_statf & TRIG1S_F)) return;
 
  if (osd_fix_type < 2) wmask |= 1;
  if (osd_airspeed * converts < stall && takeofftime == 1) wmask |= 2;
@@ -1186,9 +1182,21 @@ void do_converts()
 void timers()
 {
   uint8_t t = 0;
-  if(millis()/1000 & 1) t |= TICK_F;
+  unsigned long m = millis();
+  if(m/1000 & 1) t |= TICK_F;
   if((t ^ osd_statf) & TICK_F) {
    osd_statf ^= TICK_F;
-   osd_statf |= WARN_CHECK_F;
+   osd_statf |= TRIG1S_F;
+  } else {
+   osd_statf &= ~TRIG1S_F;
+  }
+
+  t = 0;
+  if(m/100 & 1) t |= TICK100_F1;
+  if((t ^ osd_statf1) & TICK100_F1) {
+   osd_statf1 ^= TICK100_F1;
+   osd_statf1 |= TRIG100MS_F1;
+  } else {
+   osd_statf1 &= ~TRIG100MS_F1;
   }
 }

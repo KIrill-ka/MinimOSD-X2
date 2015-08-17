@@ -26,10 +26,7 @@ static float	    xtrack_error = 0; // Current crosstrack error on x-y plane in m
 static float        eff = 0; //Efficiency
 static uint16_t     eph = 0;
 
-//static uint8_t      base_mode=0;
 static uint8_t      panel_auto_switch=0;
-//static bool         motor_armed = 0;
-static bool         ma = 0;
 //static uint16_t     chan1_raw = 0;
 //static uint16_t     chan2_raw = 0;
 //static uint16_t     chan3_raw = 0;
@@ -38,24 +35,17 @@ static uint16_t     chan5_raw = 0;
 static uint16_t     chan6_raw = 0;
 static uint16_t     chan7_raw = 0;
 static uint16_t     chan8_raw = 0;
-//static uint16_t     chan1_raw_middle = 0;
-//static uint16_t     chan2_raw_middle = 0;
 
 static uint8_t      ch_toggle = 0;
-//static boolean      osd_set = 0;
 static boolean      switch_mode = 0;
 static boolean      takeofftime = 0;
-//static boolean      haltset = 0;
-//static boolean      pal_ntsc = 0;
 
-//static int8_t       setup_menu = 0;
 static float        converts = 0;
 static float        converth = 0;
 static uint8_t      overspeed = 0;
 static uint8_t      stall = 0;
 static uint8_t      battv = 0; //Battery warning voltage - units Volt *10 
 static uint16_t     distconv = 0;
-//static int        battp = 0;
 
 static uint8_t      spe = 0;
 static char         high = 0;
@@ -79,16 +69,13 @@ static uint8_t      osd_mode = 0;                   // Navigation mode from RC A
 static unsigned long mavLinkTimer = 0;
 static unsigned long runt =0;
 static unsigned long FTime = 0;
-//static unsigned long CallSignBlink = 0;
 static unsigned long landed = 4294967295UL;
 
 static uint8_t      osd_off_switch = 0;
 static uint8_t      osd_switch_last = 100;
 static unsigned long         osd_switch_time = 0;
-//static unsigned long         descendt = 0;
-static float         palt = 0;
+static float        palt = 0;
 static float        osd_climb = 0;
-//static float        descend = 0;
 
 static float        osd_lat = 0;                    // latidude
 static float        osd_lon = 0;                    // longitude
@@ -125,7 +112,7 @@ static int8_t   fdata_prev_panel;
 
 
 //Call sign variables
-static char         char_call[OSD_CALL_SIGN_TOTAL+1] = {0};
+static char         char_call[OSD_CALL_SIGN_TOTAL] = {0};
 
 //MAVLink session control
 //static boolean      iconAS = 0;
@@ -135,8 +122,8 @@ static char         char_call[OSD_CALL_SIGN_TOTAL+1] = {0};
 //static boolean      landing = 0;
 static unsigned long  last_mav_data_ts = 0;
 //static uint8_t      apm_mav_type;
-#define TICK_F 1
-#define WARN_CHECK_F 2
+#define TICK_F       1
+#define TRIG1S_F     2
 #define WARN_PANEL_F 4
 #define WARN_MOTOR_F 8
 #define FDATA_OFF_F 16
@@ -144,6 +131,12 @@ static unsigned long  last_mav_data_ts = 0;
 #define SCREEN_UP_F 64
 #define NEW_CFG_F  128
 static uint8_t      osd_statf = 0;
+
+#define TRIG100MS_F1         1
+#define TICK100_F1           2
+#define EFF_RESET_GLIDE_F1   4
+static uint8_t      osd_statf1 = 0;
+
 
 static const uint8_t npanels = 3;
 static uint8_t panel = 0; 
