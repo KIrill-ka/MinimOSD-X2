@@ -311,22 +311,62 @@ proc bl_write_eep_num {fd addr byte {verify 0}} {
 }
 
 proc bl_write_flash_page {fd addr data} {
+ puts "write page @$addr"
  if {[string length $data] != 128} {
   error "bl_write_flash_page: wrong data size [string length $data]"
  }
  if {($addr % 128) != 0} {
   error "bl_write_flash_page: address is not on page boundary $addr"
  }
- return [bl_write_mem $fd FLASH $addr $d 1]
+ return [bl_write_mem $fd FLASH $addr $data 1]
 }
 
 proc bl_write_bl_jump {fd} {
- set jump_page [binary format @127cH8 0 0C94003C]
+ set jump_page [binary format @127c@0H8 0 0C94003C]
  return [bl_write_flash_page $fd 0 $jump_page]
 }
 
-proc ihex_read {fname} {
+proc bl_write_flash {fd firmware} {
 
+ if {![bl_write_bl_jump $fd]} {
+  my_error "can't program first flash page"
+ }
+ set end [string length $firmware]
+ set off 128
+ while {1} {
+  binary scan $firmware "@${off}a128" data
+  for {set i 0} {$i < 5} {incr i} {
+   if {[bl_write_flash_page $fd $off $data]} break
+   verbose_msg "bootloader: retrying flash page write at @$off"
+  }
+  if {$i == 5} {
+   my_error "flash write failed at @$off"
+  }
+  if {$off == 0} break
+  incr off 128
+  if {$off > $end} {set off 0}
+ }
+}
+
+proc ihex_read_and_check {fname} {
+ set x [ihex_read $fname]
+ if {[llength $x] != 2} {
+  my_error "ihex has more than one chunk"
+ }
+ if {[lindex $x 0] != 0} {
+  my_error "firmware is not starting from address 0"
+ }
+ set data [lindex $x 1]
+ set len [string length $data]
+ if {$len > 32768-2048} {
+  my_error "firmware is too big"
+ }
+ if {$len < 128} {
+  my_error "firmware is too small"
+ }
+ set pagepad [expr {(($len-1)/128+1)*128-1}]
+ set data [binary format "@${pagepad}c@0a*" 0 $data]
+ return $data
 }
 
 proc bl_exit {fd} {
@@ -927,5 +967,12 @@ if {$op eq "writefont"} {
 }
 
 if {$op eq "writefw"} {
+ if {!$mav_config} {
   exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
+ } else {
+    set firmware [ihex_read_and_check $fwfn]
+    set bl_fd [bl_open_mav 1000 100]
+    bl_write_flash $bl_fd $firmware
+    bl_exit $bl_fd
+ }
 }

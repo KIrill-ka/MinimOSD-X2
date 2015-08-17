@@ -191,11 +191,7 @@ void readSettings()
     battv = EEPROM.read(battv_ADDR);
     switch_mode = EEPROM.read(switch_mode_ADDR);
     panel_auto_switch = EEPROM.read(AUTO_SCREEN_SWITC_ADD);
-//    if (EEPROM.read(ch_toggle_ADDR) < 4 || EEPROM.read(ch_toggle_ADDR) > 8){
-//     	EEPROM.write(ch_toggle_ADDR, 5);
-//	}
     ch_toggle = EEPROM.read(ch_toggle_ADDR);
-    //  battp = EEPROM.read(battp_ADDR);
     rssical = EEPROM.read(OSD_RSSI_HIGH_ADDR);
     rssipersent = EEPROM.read(OSD_RSSI_LOW_ADDR);
     rssiraw_on = EEPROM.read(OSD_RSSI_RAW_ADDR);
@@ -203,12 +199,10 @@ void readSettings()
     batt_warn_level = EEPROM.read(OSD_BATT_WARN_ADDR);
     rssi_warn_level = EEPROM.read(OSD_RSSI_WARN_ADDR);
     
-    int i;
-    for(i=0; i < OSD_CALL_SIGN_TOTAL; i++) {
+    uint8_t i;
+    for(i=0; i < OSD_CALL_SIGN_TOTAL; i++) 
         char_call[i] = EEPROM.read(OSD_CALL_SIGN_ADDR + i);
-        if(char_call[i] == 0 || char_call[i] == '\xff') break;
-    }
-    char_call[i] ='\0'; // null terminate the string 
+    
     if(osd_statf & NEW_CFG_F) {
      motor_warn_thr = EEPROM.read(MOTOR_WARN_THR_ADDR);
      motor_warn_curr = EEPROM.read(MOTOR_WARN_CURR_ADDR);
