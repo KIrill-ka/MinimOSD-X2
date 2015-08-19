@@ -106,6 +106,7 @@ static uint8_t     osd_throttle = 0;               // throtle
 static uint16_t     temperature = 0;
 static uint8_t      tempconv = 1;
 static uint16_t     tempconvAdd = 0;
+static uint16_t     osd_battb_volt = 0;
 static char     distchar = 0;
 static char     climbchar = 0;
 static int8_t   fdata_prev_panel;

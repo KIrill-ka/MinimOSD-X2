@@ -74,6 +74,9 @@ void read_mavlink()
                     osd_mode = (uint8_t)mavlink_msg_heartbeat_get_custom_mode(&msg);
                 }
                 break;
+            case MAVLINK_MSG_ID_BATTERY2:
+                osd_battb_volt = mavlink_msg_battery2_get_voltage(&msg);
+                break;
             case MAVLINK_MSG_ID_SYS_STATUS:
                 {
                     osd_vbat_A = (mavlink_msg_sys_status_get_voltage_battery(&msg) / 1000.0f); //Battery voltage, in millivolts (1 = 1 millivolt)

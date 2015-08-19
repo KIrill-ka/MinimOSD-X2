@@ -24,165 +24,10 @@ byte setBit(byte &Reg, byte whichBit, boolean stat) {
     return Reg;
 }
 
-// EEPROM reader/writers
-// Utilities for writing and reading from the EEPROM
 byte readEEPROM(uint16_t address) {
 
     return EEPROM.read(address);
 }
-
-#if 0 // obsolete
-void writeEEPROM(byte value, int address) {
-    EEPROM.write(address, value);
-}
-
-
-void InitializeOSD() {
-
-//    loadBar();
-//    delay(500);
-
-    writeEEPROM(42, CHK1);
-    writeEEPROM(VER-42,CHK2);
-    for(panel = 0; panel < npanels; panel++) writeSettings();
-
-//    osd.setPanel(4,9);
-//    osd.openPanel();
-//    osd.printf_P(PSTR("OSD Initialized, reboot")); 
-//    osd.closePanel();
-
-    // run for ever so user resets 
-    for(;;) {}
-
-}
-
-// Write our latest FACTORY settings to EEPROM
-void writeSettings() {
-    // Writing all default parameters to EEPROM, ON = panel enabled  
-    // All panels have 3 values:
-    //  - Enable/Disable
-    //  - X coordinate on screen
-    //  - Y coordinate on screen
-    uint16_t offset = OffsetBITpanel * panel;
-//    writeEEPROM(off, panCenter_en_ADDR + offset);
-//    writeEEPROM(13, panCenter_x_ADDR + offset);
-//    writeEEPROM(7,  panCenter_y_ADDR + offset);
-    writeEEPROM(on, panPitch_en_ADDR + offset);
-    writeEEPROM(23, panPitch_x_ADDR + offset);
-    writeEEPROM(11, panPitch_y_ADDR + offset);
-    writeEEPROM(on, panRoll_en_ADDR + offset);
-    writeEEPROM(12, panRoll_x_ADDR + offset);
-    writeEEPROM(1,  panRoll_y_ADDR + offset);
-    writeEEPROM(on, panBatt_A_en_ADDR + offset);
-    writeEEPROM(14, panBatt_A_x_ADDR + offset);
-    writeEEPROM(14,  panBatt_A_y_ADDR + offset);
-    //writeEEPROM(on, panBatt_B_en_ADDR);
-    //writeEEPROM(21, panBatt_B_x_ADDR);
-    //writeEEPROM(3,  panBatt_B_y_ADDR);
-    writeEEPROM(on, panGPSats_en_ADDR + offset);
-    writeEEPROM(1,  panGPSats_x_ADDR + offset);
-    writeEEPROM(11, panGPSats_y_ADDR + offset);
-    writeEEPROM(on, panCOG_en_ADDR + offset);
-    writeEEPROM(5,  panCOG_x_ADDR + offset);
-    writeEEPROM(11, panCOG_y_ADDR + offset);
-    writeEEPROM(on, panGPS_en_ADDR + offset);
-    writeEEPROM(1,  panGPS_x_ADDR + offset);
-    writeEEPROM(14, panGPS_y_ADDR + offset);
-    writeEEPROM(on, panRose_en_ADDR + offset);
-    writeEEPROM(21, panRose_x_ADDR + offset);
-    writeEEPROM(15, panRose_y_ADDR + offset);
-    writeEEPROM(on, panHeading_en_ADDR + offset);
-    writeEEPROM(24, panHeading_x_ADDR + offset);
-    writeEEPROM(14, panHeading_y_ADDR + offset);
-//    writeEEPROM(on, panMavBeat_en_ADDR + offset);
-//    writeEEPROM(2,  panMavBeat_x_ADDR + offset);
-//    writeEEPROM(9, panMavBeat_y_ADDR + offset);
-    writeEEPROM(on, panHomeDir_en_ADDR + offset);
-    writeEEPROM(14, panHomeDir_x_ADDR + offset);
-    writeEEPROM(3,  panHomeDir_y_ADDR + offset);
-    writeEEPROM(on, panHomeDis_en_ADDR + offset);
-    writeEEPROM(22, panHomeDis_x_ADDR + offset);
-    writeEEPROM(1,  panHomeDis_y_ADDR + offset);
- //   writeEEPROM(off,panWPDir_en_ADDR);
- //   writeEEPROM(27,  panWPDir_x_ADDR);
- //   writeEEPROM(12,  panWPDir_y_ADDR);
-    writeEEPROM(off, panWPDis_en_ADDR);
-    writeEEPROM(9,  panWPDis_x_ADDR);
-    writeEEPROM(14, panWPDis_y_ADDR);
-    writeEEPROM(on, panRSSI_en_ADDR + offset);
-    writeEEPROM(8,  panRSSI_x_ADDR + offset);
-    writeEEPROM(13, panRSSI_y_ADDR + offset);
-    writeEEPROM(on, panCur_A_en_ADDR + offset);
-    writeEEPROM(14, panCur_A_x_ADDR + offset);
-    writeEEPROM(15, panCur_A_y_ADDR + offset);
-    //writeEEPROM(on, panCur_B_en_ADDR);
-    //writeEEPROM(21, panCur_B_x_ADDR);
-    //writeEEPROM(4,  panCur_B_y_ADDR);
-    writeEEPROM(on, panAlt_en_ADDR + offset);
-    writeEEPROM(22, panAlt_x_ADDR + offset);
-    writeEEPROM(3,  panAlt_y_ADDR + offset);
-    writeEEPROM(on, panHomeAlt_en_ADDR + offset);
-    writeEEPROM(22, panHomeAlt_x_ADDR + offset);
-    writeEEPROM(2,  panHomeAlt_y_ADDR + offset);
-    writeEEPROM(on, panVel_en_ADDR + offset);
-    writeEEPROM(1,  panVel_x_ADDR + offset);
-    writeEEPROM(2,  panVel_y_ADDR + offset);
-    writeEEPROM(on, panAirSpeed_en_ADDR + offset);
-    writeEEPROM(1,  panAirSpeed_x_ADDR + offset);
-    writeEEPROM(1,  panAirSpeed_y_ADDR + offset); 
-    writeEEPROM(on, panBatteryPercent_en_ADDR + offset);
-    writeEEPROM(1,  panBatteryPercent_x_ADDR + offset);
-    writeEEPROM(4,  panBatteryPercent_y_ADDR + offset); 
-    writeEEPROM(on, panTime_en_ADDR + offset);
-    writeEEPROM(23, panTime_x_ADDR + offset);
-    writeEEPROM(13, panTime_y_ADDR + offset);
-    writeEEPROM(on, panThr_en_ADDR + offset);
-    writeEEPROM(1,  panThr_x_ADDR + offset);
-    writeEEPROM(3,  panThr_y_ADDR + offset);
-    writeEEPROM(on, panFMod_en_ADDR + offset);
-    writeEEPROM(1,  panFMod_x_ADDR + offset);
-    writeEEPROM(13, panFMod_y_ADDR + offset);
-    writeEEPROM(on, panHorizon_en_ADDR + offset);
-    writeEEPROM(8,  panHorizon_x_ADDR + offset);
-    writeEEPROM(6,  panHorizon_y_ADDR + offset);
-    writeEEPROM(on, panWarn_en_ADDR + offset);
-    writeEEPROM(9,  panWarn_x_ADDR + offset);
-    writeEEPROM(4,  panWarn_y_ADDR + offset);
-    writeEEPROM(on, panOff_en_ADDR + offset);
-//    writeEEPROM(10, panOff_x_ADDR + offset);
-//    writeEEPROM(4,  panOff_y_ADDR + offset);
-    writeEEPROM(on, panWindSpeed_en_ADDR + offset);
-    writeEEPROM(24, panWindSpeed_x_ADDR + offset);
-    writeEEPROM(7,  panWindSpeed_y_ADDR + offset);
-    writeEEPROM(on, panClimb_en_ADDR + offset);
-    writeEEPROM(1,  panClimb_x_ADDR + offset);
-    writeEEPROM(8,  panClimb_y_ADDR + offset);
-    writeEEPROM(on, panTune_en_ADDR + offset);
-    writeEEPROM(10, panTune_x_ADDR + offset);
-    writeEEPROM(4,  panTune_y_ADDR + offset);
-    writeEEPROM(on, panEff_en_ADDR + offset);
-    writeEEPROM(14, panEff_x_ADDR + offset);
-    writeEEPROM(13, panEff_y_ADDR + offset);
- //   writeEEPROM(on, panCh_en_ADDR + offset);
- //   writeEEPROM(10, panCh_x_ADDR + offset);
- //   writeEEPROM(4,  panCh_y_ADDR + offset);
-    writeEEPROM(off, panTemp_en_ADDR + offset);
-    writeEEPROM(22, panTemp_x_ADDR + offset);
-    writeEEPROM(14, panTemp_y_ADDR + offset);
-//    writeEEPROM(on, panFata_en_ADDR + offset);
-//    writeEEPROM(10, panFdata_x_ADDR + offset);
-//    writeEEPROM(4,  panFdata_y_ADDR + offset);
-    writeEEPROM(off, panDistance_en_ADDR + offset);
-    writeEEPROM(22, panDistance_x_ADDR + offset);
-    writeEEPROM(2,  panDistance_y_ADDR + offset);
- 
-    writeEEPROM(30,overspeed_ADDR);
-    writeEEPROM(0,stall_ADDR);
-    writeEEPROM(100,battv_ADDR); //10Volts
-    writeEEPROM(6,ch_toggle_ADDR);
-
-}
-#endif
 
 void readSettings() 
 {
@@ -370,25 +215,26 @@ void readPanelSettings() {
     panCameraPos_XY[1][panel] = checkPAL(readEEPROM(panCamPos_y_ADDR + offset));
 }
 
-int checkPAL(int line){
-    if(line >= osd.getCenter() && osd.getMode() == 0){
-        line -= 3;//Cutting lines offset after center if NTSC
-    }
+static int checkPAL(int line){
+    if(line >= MAX7456_CENTER_NTSC && osd.getMode() == 0) line -= 3;
     return line;
 }
 
-#if 0
-void updateSettings(byte panelu, byte panel_x, byte panel_y, byte panel_s ) {
-    if(panel >= 1 && panel <= 32) {
+static bool 
+get_item_config(uint16_t addr, uint8_t panel, uint8_t *xr, uint8_t *yr, uint8_t *flag_bits)
+{
+ uint8_t x, y, f;
 
-        writeEEPROM(panel_s, (6 * panelu) - 6 + 0);
-        if(panel_s != 0) {
-            writeEEPROM(panel_x, (6 * panelu) - 6 + 2);
-            writeEEPROM(panel_y, (6 * panelu) - 6 + 4);
-        }
-        osd.clear();
-        readSettings();
-        for(panel = 0; panel < npanels; panel++) readPanelSettings();
-    } 
+ if((osd_statf & NEW_CFG_F) == 0) return false;
+ addr += panel * PANEL_CONFIG_SIZE;
+ x = eeprom_read_byte((uint8_t*)addr);
+ if (x & 0x80) return false;
+ y = eeprom_read_byte((uint8_t*)addr+1);
+ f = (y >> 4) | ((x & 0x60)>>1);
+ y &= 0x0f;
+ x &= 0x1f;
+ *yr = checkPAL(y);
+ *xr = x;
+ *flag_bits = f;
+ return true;
 }
-#endif

@@ -7,7 +7,7 @@
 #define VER_OLD 76 
 
 // new eeprom format version
-#define VER_NEW 4
+#define VER_NEW 5
 
 // EEPROM Stepping, be careful not to overstep. 
 // We reserved floats for just to be sure if some values needs to be
@@ -79,9 +79,6 @@
 #define panBatt_A_en_ADDR 18
 #define panBatt_A_x_ADDR 20
 #define panBatt_A_y_ADDR 22
-#define panBatt_B_en_ADDR 24
-#define panBatt_B_x_ADDR 26
-#define panBatt_B_y_ADDR 28
 #define panGPSats_en_ADDR 30
 #define panGPSats_x_ADDR 32
 #define panGPSats_y_ADDR 34
@@ -92,7 +89,6 @@
 #define panGPS_x_ADDR 44
 #define panGPS_y_ADDR 46
 
-// Second set of 8 panels
 #define panRose_en_ADDR 48
 #define panRose_x_ADDR 50
 #define panRose_y_ADDR 52
@@ -122,9 +118,6 @@
 #define panCur_A_en_ADDR 98 
 #define panCur_A_x_ADDR 100 
 #define panCur_A_y_ADDR 102 
-#define panCurB_en_ADDR 104 //(!Not implemented)
-#define panCurB_x_ADDR 106 //
-#define panCurB_y_ADDR 108 //
 #define panAlt_en_ADDR 110
 #define panAlt_x_ADDR 112
 #define panAlt_y_ADDR 114
@@ -188,6 +181,10 @@
 #define panCamPos_en_ADDR 230
 #define panCamPos_x_ADDR 231
 #define panCamPos_y_ADDR 232
+
+/* new format panel items, they are read directly from eeprom */
+#define EEP_EF_CLIMB    233
+#define EEP_BATT_B_VOLT 235
 
 #define SIGN_MSL_ON_ADDR 876
 #define SIGN_HA_ON_ADDR 878

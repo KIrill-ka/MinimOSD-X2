@@ -59,6 +59,7 @@ void writePanels()
     if(ch_toggle > 3) check_panel_switch(1);
     fdata_prev_panel = panel;
     if(panel != npanels) {
+      uint8_t x, y, f;
       //Testing bits from 8 bit register A 
       //if(ISa(panel,Cen_BIT)) panCenter(panCenter_XY[0][panel], panCenter_XY[1][panel]);   //4x2
       if(ISd(panel,Warn_BIT)) panWarn(panWarn_XY[0][panel], panWarn_XY[1][panel]);
@@ -108,9 +109,10 @@ void writePanels()
       //if(ISe(panel,Ch_BIT)) panCh(panCh_XY[0][panel], panCh_XY[1][panel]);
       if(ISe(panel,DIST_BIT)) panDistance(panDistance_XY[0][panel], panDistance_XY[1][panel]);
       if(ISe(panel,CAM_POS_BIT)) panCamPos(panCameraPos_XY[0][panel], panCameraPos_XY[1][panel]);
-      if(ISd(0,CALLSIGN_BIT)) panCALLSIGN(panCALLSIGN_XY[0][panel], panCALLSIGN_XY[1][panel]); //call sign even in off panel
-      osd.setPanel(13, 4);
-      //osd.printf_P(PSTR("=%i"), (int)debug_r);
+      if(ISd(0,CALLSIGN_BIT)) panCALLSIGN(panCALLSIGN_XY[0][panel], panCALLSIGN_XY[1][panel]);
+      if(get_item_config(panel, EEP_BATT_B_VOLT, &x, &y, &f)) showBatteryBVolt(x, y, f);
+      if(get_item_config(panel, EEP_EF_CLIMB, &x, &y, &f)) showClimbEfficiency(x, y, f);
+
     } else {
      /* show warnings even if screen is disabled */
      for(p = 0; p < npanels; p++)
@@ -262,6 +264,11 @@ void panEff(int first_col, int first_line){
 
 }
 
+void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
+{
+
+}
+
 /* **************************************************************** */
 // Panel  : panCh
 // Needs  : X, Y locations
@@ -329,79 +336,6 @@ void panCALLSIGN(int first_col, int first_line){
     }
 }
 
-/* **************************************************************** */
-// Panel  : panSetup
-// Needs  : Nothing, uses whole screen
-// Output : The settings menu
-// Size   : 3 x ?? (rows x chars)
-// Staus  : done
-
-//void panSetup(){
-
-//    if (millis() > text_timer){
-//        text_timer = millis() + 500;
-
-//        osd.clear();
-//        osd.setPanel(5, 7);
-//        osd.openPanel();
-
-//        if (chan1_raw_middle == 0 && chan2_raw_middle == 0){
-//            chan1_raw_middle = chan1_raw;
-//            chan2_raw_middle = chan2_raw;
-//        }
-
-//        if ((chan2_raw - 100) > chan2_raw_middle ) setup_menu++;  //= setup_menu + 1;
-//        else if ((chan2_raw + 100) < chan2_raw_middle ) setup_menu--;  //= setup_menu - 1;
-//        if (setup_menu < 0) setup_menu = 0;
-//        else if (setup_menu > 2) setup_menu = 2;
-
-
-//        switch (setup_menu){
-//        case 0:
-//            {
-//                osd.printf_P(PSTR("    Overspeed    "));
-//                osd.printf("%3.0i%c", overspeed, spe);
-//                overspeed = change_val(overspeed, overspeed_ADDR);
-//                break;
-//            }
-//        case 1:
-//            {
-//                osd.printf_P(PSTR("   Stall Speed   "));
-//                osd.printf("%3.0i%c", stall , spe);
-//                //overwritedisplay();
-//                stall = change_val(stall, stall_ADDR);
-//                break;
-//            }
-//        case 2:
-//            {
-//                osd.printf_P(PSTR("Battery warning "));
-//                osd.printf("%3.1f%c", float(battv)/10.0 , 0x76, 0x20);
-//                battv = change_val(battv, battv_ADDR);
-//                break;
-//            }
-            //      case 4:
-            //        osd.printf_P(PSTR("Battery warning "));
-            //        osd.printf("%3.0i%c", battp , 0x25);
-            //        if ((chan1_raw - 100) > chan1_raw_middle ){
-            //        battp = battp - 1;}
-            //        if ((chan1_raw + 100) < chan1_raw_middle ){
-            //        battp = battp + 1;} 
-            //        EEPROM.write(208, battp);
-            //        break;
-//        }
-//}
-//    osd.closePanel();
-//}
-
-//int change_val(int value, int address)
-//{
-//    uint8_t value_old = value;
-//    if (chan1_raw > chan1_raw_middle + 100) value--;
-//    if (chan1_raw  < chan1_raw_middle - 100) value++;
-
-//    if(value != value_old && setup_menu ) EEPROM.write(address, value);
-//    return value;
-//}
 
 /* **************************************************************** */
 // Panel  : pan wind speed
@@ -783,6 +717,12 @@ void panPitch(int first_col, int first_line){
 void panRoll(int first_col, int first_line){
     osd.setPanel(first_col, first_line);
     osd.printf_P(PSTR("%4i%c%c"),osd_roll,0x05,0x06);
+}
+
+void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags)
+{
+    osd.setPanel(x, y);
+    osd.printf_P(PSTR("%5.2f%c"), (float)osd_battb_volt/1000.0f, 0x0d);
 }
 
 /* **************************************************************** */

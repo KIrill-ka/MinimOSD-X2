@@ -4,7 +4,7 @@ void do_converts();
 void panFdata();
 void writeSettings();
 void readPanelSettings();
-int checkPAL(int line);
+static int checkPAL(int line);
 void updateSettings(byte panelu, byte panel_x, byte panel_y, byte panel_s );
 void unplugSlaves();
 void startPanels();
@@ -49,6 +49,8 @@ void panClimb(int first_col, int first_line);
 void panTune(int first_col, int first_line);
 void showHorizon(int start_col, int start_row);
 void panCamPos(int first_col, int first_line);
+void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags);
+void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags);
 
 void uploadFont();
 void load_mavlink_settings(void);
