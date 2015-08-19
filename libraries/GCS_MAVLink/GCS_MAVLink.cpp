@@ -18,4 +18,11 @@ version 2.1 of the License, or (at your option) any later version.
 
 BetterStream	*mavlink_comm_0_port;
 
-mavlink_system_t mavlink_system = {97,94,0,0}; /* FIXME: possibly we can borrow systemid from AP */
+mavlink_system_t mavlink_system = {97,94};
+
+static const uint8_t mavlink_message_crc_progmem[256] PROGMEM = MAVLINK_MESSAGE_CRCS;
+
+uint8_t mavlink_get_message_crc(uint8_t msgid)
+{
+    return pgm_read_byte(&mavlink_message_crc_progmem[msgid]);
+}

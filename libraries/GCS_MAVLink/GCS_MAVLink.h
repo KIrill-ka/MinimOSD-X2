@@ -23,9 +23,6 @@
 /// MAVLink stream used for HIL interaction
 extern BetterStream	*mavlink_comm_0_port;
 
-/// MAVLink stream used for ground control communication
-extern BetterStream	*mavlink_comm_1_port;
-
 /// MAVLink system definition
 extern mavlink_system_t mavlink_system;
 
@@ -36,16 +33,8 @@ extern mavlink_system_t mavlink_system;
 ///
 static inline void comm_send_ch(mavlink_channel_t chan, uint8_t ch)
 {
-    switch(chan) {
-	case MAVLINK_COMM_0:
-		mavlink_comm_0_port->write(ch);
-		break;
-	case MAVLINK_COMM_1:
-		mavlink_comm_1_port->write(ch);
-		break;
-	default:
-		break;
-	}
+	if(chan != MAVLINK_COMM_0) return;
+	mavlink_comm_0_port->write(ch);
 }
 
 /// Read a byte from the nominated MAVLink channel
@@ -55,19 +44,8 @@ static inline void comm_send_ch(mavlink_channel_t chan, uint8_t ch)
 ///
 static inline uint8_t comm_receive_ch(mavlink_channel_t chan)
 {
-    uint8_t data = 0;
-
-    switch(chan) {
-	case MAVLINK_COMM_0:
-		data = mavlink_comm_0_port->read();
-		break;
-	case MAVLINK_COMM_1:
-		data = mavlink_comm_1_port->read();
-		break;
-	default:
-		break;
-	}
-    return data;
+	if(chan != MAVLINK_COMM_0) return 0;
+	return mavlink_comm_0_port->read();
 }
 
 /// Check for available data on the nominated MAVLink channel
@@ -76,18 +54,8 @@ static inline uint8_t comm_receive_ch(mavlink_channel_t chan)
 /// @returns		Number of bytes available
 static inline uint16_t comm_get_available(mavlink_channel_t chan)
 {
-    uint16_t bytes = 0;
-    switch(chan) {
-	case MAVLINK_COMM_0:
-		bytes = mavlink_comm_0_port->available();
-		break;
-	case MAVLINK_COMM_1:
-		bytes = mavlink_comm_1_port->available();
-		break;
-	default:
-		break;
-	}
-    return bytes;
+	if(chan != MAVLINK_COMM_0) return 0;
+	return mavlink_comm_0_port->available();
 }
 
 
@@ -97,19 +65,13 @@ static inline uint16_t comm_get_available(mavlink_channel_t chan)
 /// @returns		Number of bytes available, -1 for error
 static inline int comm_get_txspace(mavlink_channel_t chan)
 {
-    switch(chan) {
-	case MAVLINK_COMM_0:
-		return mavlink_comm_0_port->txspace();
-		break;
-	case MAVLINK_COMM_1:
-		return mavlink_comm_1_port->txspace();
-		break;
-	default:
-		break;
-	}
-    return -1;
+	if(chan != MAVLINK_COMM_0) return -1;
+	return mavlink_comm_0_port->txspace();
 }
 
+uint8_t mavlink_get_message_crc(uint8_t msgid);
+
+#define MAVLINK_MESSAGE_CRC(msgid) mavlink_get_message_crc(msgid)
 #define MAVLINK_USE_CONVENIENCE_FUNCTIONS
 #include "include/mavlink/v1.0/ardupilotmega/mavlink.h"
 
