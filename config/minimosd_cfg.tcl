@@ -7,9 +7,9 @@ if {[info exists env(HOME)]} {
 }
 
 
-set eeprom_version 4
+set eeprom_version 5
 set npanels 3
-set fw_version "0.5.0"
+set fw_version "0.5.1"
 
 array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
@@ -44,6 +44,10 @@ CALLSIGN_en 200 CALLSIGN_x 202 CALLSIGN_y 204
 Temp_en 212 Temp_x 214 Temp_y 216
 Distance_en 224 Distance_x 226 Distance_y 228
 CamPos_en 230 CamPos_x 231 CamPos_y 232
+
+EF_CLIMB_panel_item 233
+BATT_B_VOLT_panel_item 235
+BATT_B_AMP_panel_item 237
 
 SIGN_MSL_ON 876
 SIGN_HA_ON 878
@@ -117,6 +121,7 @@ set cfg_new_vars {
  VOFFSET HOFFSET MAV_BAUD
  MOTOR_WARN_CURR MOTOR_WARN_THR
  CamPos
+ BATT_B_VOLT BATT_B_AMP EF_CLIMB
 }
 
 proc cfg_var_valid {var {panel -1}} {
@@ -155,11 +160,9 @@ proc my_error {msg} {
 }
 
 set op ""
-set noclear 0
-set mav_config 0
-set mav_baud 57600 
-set mav_dev 0
-set verbose 0
+if {![info exists mav_dev]} {set mav_dev 0}
+if {![info exists verbose]} {set verbose 0}
+if {![info exists noclear]} {set noclear 0}
 
 for {set i 0} {$i < [llength $argv]} {incr i} {
  switch [lindex $argv $i] {
@@ -171,7 +174,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-fw" {incr i; set fwfn [lindex $argv $i]}
   "-noclear" {set noclear 1}
   "-verbose" {set verbose 1; set mav::verbose 1}
-  "-mav" {set mav_config 1}
+  "-mav" {set serial_over_mav 1}
   "-mav_baud" {incr i; set mav_baud [lindex $argv $i]}
   "-mav_dev" {incr i; set mav_dev [lindex $argv $i]}
   "help" {usage 0}
@@ -190,10 +193,18 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 if {$op eq ""} {usage 1}
 
 if {![info exists serial_port]} {
- if {$mav_config} {
+ if {$serial_over_mav} {
   set serial_port "/dev/ttyACM0"
  } else {
   set serial_port "/dev/ttyUSB0"
+ }
+}
+
+if {![info exists mav_baud]} {
+ if {$serial_over_mav} {
+  set mav_baud 115200
+ } else {
+  set mav_baud 57600
  }
 }
 
@@ -400,10 +411,42 @@ proc bl_check_sig {fd} {
  return 0
 }
 
-proc panel_var {panel var suffix} {
-   set addr [expr {$::name2addr(${var}_${suffix}) + 250*$panel}]
-   binary scan $::eep @${addr}cu val
-   return $val
+proc var_type {name} {
+  if {$name2addr($i) < 250} {
+   if {![string match "*_en" $i]} {return panel_item_old}
+   if {![string match "*_panel_item" $i]} {return panel_item}
+   return unknown
+  }
+  return var
+}
+
+proc var_name {full_name} {
+ set t [var_type $full_name]
+ if {$t eq {panel_item_old}} {return [string range $i 0 end-3]}
+ if {$t eq {panel_item}} {return [string range $i 0 end-11]}
+ return $full_name
+}
+
+proc panel_var {panel var} {
+   if {[var_type $var] eq {panel_item_old}} {
+     set ret {}
+     set v [var_name $var]
+     for i in {en x y} {
+      set addr [expr {$::name2addr(${v}_${i}) + 250*$panel}]
+      binary scan $::eep @${addr}cu val
+      lappend ret $i $val
+     }
+     return $ret
+   }
+
+   set addr [expr {$::name2addr($v) + 250*$panel}]
+   binary scan $::eep @${addr}Su val
+   if {$val & 0x8000} {set en 1}
+   set ret [list en $en]
+   lappend ret x [expr {($val>>8)&0x1f}]
+   lappend ret y [expr {$val&0x0f}]
+
+   return $ret
 }
 
 array set special_get {
@@ -455,27 +498,31 @@ proc cfg_var {var} {
    return $val
 }
 
-proc dump_panel_cfg {fd var} {
+proc dump_panel_cfg {fd var_name} {
  set sps ""
+
+ set var [var_name $var_name]
+
  for {set i [expr {18-[string length $var]}]} {$i != 0} {incr i -1} {
     append sps " "
  }
 
  set en "-"
  for {set panel 0} {$panel < $::npanels} {incr panel} {
-  if {[panel_var $panel $var en]} {set en "+"}
+  array set v [panel_var $panel $var_name]
+  if {$v(en)} {set en "+"}
+  array unset v
  }
  puts -nonewline $fd "$en$var$sps"
  for {set panel 0} {$panel < $::npanels} {incr panel} {
-   if {![cfg_var_valid $var $panel]} {
+  if {![cfg_var_valid $var $panel]} {
     puts -nonewline $fd "-   0   0"
     continue
-   }
-   set en [panel_var $panel $var en]
-   set x [panel_var $panel $var x]
-   set y [panel_var $panel $var y]
-   if {$en} {set en " +"} else {set en " -"}
-   puts -nonewline $fd [format "%s %3d %3d" $en $x $y]
+  }
+  array set v [panel_var $panel $var_name]
+  if {$v(en)} {set en " +"} else {set en " -"}
+  puts -nonewline $fd [format "%s %3d %3d" $en $v(x) $v(y)]
+  array unset v
  }
  puts $fd ""
 }
@@ -529,20 +576,29 @@ proc set_var {f var val} {
    return
  }
  set addr $::name2addr($var)
- #puts "normal var $addr $val"
- $::write_var $f $addr [binary format c $val]
+ $::write_var $f $addr [binary format S $val]
 }
 
 proc set_panel_var {f p var suffix val} {
- set addr $::name2addr(${var}_${suffix})
+ if {[info exits ::name2addr(${var}_en)]} {
+  # old style format
+  foreach {i j} $val {
+   set addr $::name2addr(${var}_${i})
+   set addr [expr {$addr + $p*250}]
+   $::write_var $f $addr [binary format c $j]
+  }
+  return
+ }
+ array set v $val
+ set vv [expr {($v(en)<<15) | $v(y) | ($v(x)<<8)}]
+ set addr $::name2addr(${var}_panel_item)
  set addr [expr {$addr + $p*250}]
- #puts "panel var $addr $val [format %02X $val]"
- $::write_var $f $addr [binary format c $val]
+ $::write_var $f $addr [binary format c $vv]
 }
 
 if {[info exists fn]} {
   set eeprom_access file
-} elseif {$mav_config} {
+} elseif {$serial_over_mav} {
   set eeprom_access mav
 } else {
   set eeprom_access bl
@@ -612,13 +668,13 @@ if {$op eq "read"} {
   set ofd stdout
  }
  foreach i [lsort [array names name2addr]] {
-   if {$name2addr($i) >= 250} continue
-   if {![string match "*_en" $i]} continue
-   set var [string range $i 0 end-3]
+   set vt [var_type $i]
+   if {$vt ne {panel_item} && $vt ne {panel_item_old}} continue
    dump_panel_cfg $ofd $var
   }
   foreach i [lsort [array names name2addr]] {
-   if {$name2addr($i) < 250} continue
+   set vt [var_type $i]
+   if {$vt ne {var}} continue
    dump_var $ofd $i
   }
  if {$ofd ne "stdout"} {close $ofd}
@@ -651,6 +707,7 @@ if {$op eq "write"} {
   set eep [binary format @1023c 0]
   set f {}
  }
+
  while {![eof $ifd]} {
   set s [gets $ifd]
   if {[string index [lindex $s 0] 0] eq "#"} continue
@@ -668,16 +725,20 @@ if {$op eq "write"} {
    set var [string range [lindex $s 0] 1 end]
    set off 1
    for {set p 0} {$p < $np} {incr p} {
-    set_panel_var $f $p $var en $plusminus([lindex $s $off]) 
+    set v {}
+    lappend v en $plusminus([lindex $s $off]) 
     incr off
-    set_panel_var $f $p $var x [lindex $s $off] 
+    lappend v x [lindex $s $off] 
     incr off
-    set_panel_var $f $p $var y [lindex $s $off]
+    lappend v y [lindex $s $off]
     incr off
+    set_panel_var $f $p $var $v
     set pv_set(${var}_en) 1
    }
-   for {} {$p < $npanels} {incr p} {
-    set_panel_var $f $p $var en 0
+   if {!$noclear} {
+    for {} {$p < $npanels} {incr p} {
+     set_panel_var $f $p $var {en 0 x 0 y 0}
+    }
    }
    continue
   }
@@ -688,11 +749,12 @@ if {$op eq "write"} {
    # set defaults
    foreach i [array names name2addr] {
     if {[info exists v_set($i)] || [info exists pv_set($i)]} continue
-    if {[string match *_en $i]} {
+    set vt [var_type $i]
+    if {$vt eq "panel_item_old" || $vt eq "panel_item"} {
      # disable all panel displays by default
-     set var [string range $i 0 end-3]
+     set var [var_name $i]
      for {set p 0} {$p < $npanels} {incr p} {
-      set_panel_var $f $p $var en 0
+      set_panel_var $f $p $var {en 0 x 0 y 0}
      }
     } elseif {[info exists var_default($i)]} {
      set_var $f $i $var_default($i)
@@ -873,6 +935,9 @@ proc get_font_loader_resp {fd buf resp} {
 }
 
 if {$op eq "writefont"} {
+ if {$serial_over_mav} {
+  my_error "font loading via mavlink is not implemented yet"
+ }
  if {[info exists fnt_file]} {
   set ifd [open $fnt_file r]
   set font_format "fnt"
@@ -967,7 +1032,7 @@ if {$op eq "writefont"} {
 }
 
 if {$op eq "writefw"} {
- if {!$mav_config} {
+ if {!$serial_over_mav} {
   exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
  } else {
     set firmware [ihex_read_and_check $fwfn]
