@@ -15,7 +15,15 @@
 #include "include/mavlink/v1.0/ardupilotmega/version.h"
 
 // this allows us to make mavlink_message_t much smaller
-#define MAVLINK_MAX_PAYLOAD_LEN MAVLINK_MAX_DIALECT_PAYLOAD_SIZE
+//
+// Mavlink uses two mavlink_message_t structures - one as parse
+// buffer, one is in stack.
+// Normal size is 255. Value of 101 will not allow to read
+// large messages which we don't need.
+// FILE_TRANSFER_PROTOCOL (254), V2_EXTENSION (254),
+// ENCAPSULATED_DATA (255)
+// LOCAL_POSITION_NED_COV (181), GLOBAL_POSITION_INT_COV (185)
+#define MAVLINK_MAX_PAYLOAD_LEN 101
 
 #define MAVLINK_COMM_NUM_BUFFERS 1
 #include "include/mavlink/v1.0/mavlink_types.h"
