@@ -110,8 +110,8 @@ void writePanels()
       if(ISe(panel,DIST_BIT)) panDistance(panDistance_XY[0][panel], panDistance_XY[1][panel]);
       if(ISe(panel,CAM_POS_BIT)) panCamPos(panCameraPos_XY[0][panel], panCameraPos_XY[1][panel]);
       if(ISd(0,CALLSIGN_BIT)) panCALLSIGN(panCALLSIGN_XY[0][panel], panCALLSIGN_XY[1][panel]);
-      if(get_item_config(panel, EEP_BATT_B_VOLT, &x, &y, &f)) showBatteryBVolt(x, y, f);
-      if(get_item_config(panel, EEP_EF_CLIMB, &x, &y, &f)) showClimbEfficiency(x, y, f);
+      if(get_item_config(EEP_BATT_B_VOLT, panel, &x, &y, &f)) showBatteryBVolt(x, y, f);
+      if(get_item_config(EEP_EF_CLIMB, panel, &x, &y, &f)) showClimbEfficiency(x, y, f);
 
     } else {
      /* show warnings even if screen is disabled */
@@ -266,7 +266,16 @@ void panEff(int first_col, int first_line){
 
 void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
 {
-
+ float eff;
+        
+ osd.setPanel(x, y);
+ if(osd_climb < 1) {
+  osd.printf_P(PSTR("%c"), 0x16);
+  return;
+ }
+ eff = osd_curr_A * (10.0f / 3.6f) / osd_climb; /* mA / km/h = mAh / km */
+ if (eff <= 9999 && eff >= -999) 
+     osd.printf_P(PSTR("%c%4.0f%c"), 0x16, eff, 0x01);
 }
 
 /* **************************************************************** */

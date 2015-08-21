@@ -228,7 +228,7 @@ get_item_config(uint16_t addr, uint8_t panel, uint8_t *xr, uint8_t *yr, uint8_t 
  if((osd_statf & NEW_CFG_F) == 0) return false;
  addr += panel * PANEL_CONFIG_SIZE;
  x = eeprom_read_byte((uint8_t*)addr);
- if (x & 0x80) return false;
+ if ((x & 0x80) == 0) return false;
  y = eeprom_read_byte((uint8_t*)addr+1);
  f = (y >> 4) | ((x & 0x60)>>1);
  y &= 0x0f;
