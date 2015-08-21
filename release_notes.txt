@@ -1,0 +1,9 @@
+0.5.1
+- Support mavlink serial port forwarding. You don't have to
+  disconnect OSD from autopilot if autopilot supports serial port forwarding.
+  Both firmware upgrade and configuration are supported in this mode.
+- Added climb efficiency display item.
+- Added second battery voltage display item.
+- minimosd_cfg now uses own bootloader interface, no need for avrdude.
+- Fixed time based value filtering so variable intervals between screen 
+  updates don't affect filtering characteristics.
