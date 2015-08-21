@@ -33,7 +33,7 @@ void writePanels()
 
   //Flight summary panel
   //Only show flight summary 7 seconds after landing
-  if (ms-7000 > landed && ms > landed+7000) { 
+  if (ms-7000 > landed) { 
    show_fdata = (osd_statf & FDATA_OFF_F) == 0 || panel == npanels;
   } else {
    osd_statf &= ~FDATA_OFF_F;

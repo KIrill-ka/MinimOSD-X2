@@ -176,7 +176,7 @@ void read_mavlink()
         }
 
         ms = millis();
-        if(ms > mav_beat_timer + MAV_BEAT_INTERVAL && ms - MAV_BEAT_INTERVAL > mav_beat_timer) {
+        if(ms > mav_beat_timer + MAV_BEAT_INTERVAL) {
          mav_beat_timer = ms;
          mavlink_msg_heartbeat_send(MAVLINK_COMM_0, 24 /*dev type MAV_TYPE*/, 0 /* AP class MAV_AUTOPILOT */, 
                          0 /* MAV_MODE_FLAGS */, osd_statf /* custom mode */, 0 /* MAV_STATE */);
