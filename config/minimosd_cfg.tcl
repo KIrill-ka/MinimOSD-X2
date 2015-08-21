@@ -15,7 +15,6 @@ array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
 Roll_en 12 Roll_x 14 Roll_y 16
 Batt_A_en 18 Batt_A_x 20 Batt_A_y 22
-Batt_B_en 24 Batt_B_x 26 Batt_B_y 28
 GPSats_en 30 GPSats_x 32 GPSats_y 34
 COG_en 36 COG_x 38 COG_y 40
 GPS_en 42 GPS_x 44 GPS_y 46
@@ -47,7 +46,6 @@ CamPos_en 230 CamPos_x 231 CamPos_y 232
 
 EF_CLIMB_panel_item 233
 BATT_B_VOLT_panel_item 235
-BATT_B_AMP_panel_item 237
 
 SIGN_MSL_ON 876
 SIGN_HA_ON 878
@@ -121,7 +119,7 @@ set cfg_new_vars {
  VOFFSET HOFFSET MAV_BAUD
  MOTOR_WARN_CURR MOTOR_WARN_THR
  CamPos
- BATT_B_VOLT BATT_B_AMP EF_CLIMB
+ BATT_B_VOLT EF_CLIMB
 }
 
 proc cfg_var_valid {var {panel -1}} {
@@ -177,6 +175,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-mav" {set serial_over_mav 1}
   "-mav_baud" {incr i; set mav_baud [lindex $argv $i]}
   "-mav_dev" {incr i; set mav_dev [lindex $argv $i]}
+  "-mav_sysid" {incr i; set mav_sysid [lindex $argv $i]}
   "help" {usage 0}
   "write" -
   "read" -
@@ -191,6 +190,10 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
 }
 
 if {$op eq ""} {usage 1}
+
+if {![info exists serial_over_mav]} {
+ set serial_over_mav 0
+}
 
 if {![info exists serial_port]} {
  if {$serial_over_mav} {
@@ -219,6 +222,7 @@ proc bl_connect {} {
  fconfigure $ofd -ttycontrol {DTR 1}
  fconfigure $ofd -ttycontrol {DTR 0}
  after 500
+ set ::bl_cmd bl_cmd_serial
  return $ofd
 }
 
@@ -287,6 +291,7 @@ proc bl_read_eep_num {ofd addr} {
 }
 
 proc bl_write_mem {ofd memtype addr data {verify 0}} {
+ verbose_msg "bootloader: write $memtype @$addr"
  if {$addr & 1} {
   if {$memtype eq "FLASH"} {
    error "can't write to odd FLASH address"
@@ -322,7 +327,6 @@ proc bl_write_eep_num {fd addr byte {verify 0}} {
 }
 
 proc bl_write_flash_page {fd addr data} {
- puts "write page @$addr"
  if {[string length $data] != 128} {
   error "bl_write_flash_page: wrong data size [string length $data]"
  }
@@ -412,9 +416,9 @@ proc bl_check_sig {fd} {
 }
 
 proc var_type {name} {
-  if {$name2addr($i) < 250} {
-   if {![string match "*_en" $i]} {return panel_item_old}
-   if {![string match "*_panel_item" $i]} {return panel_item}
+  if {$::name2addr($name) < 250} {
+   if {[string match "*_en" $name]} {return panel_item_old}
+   if {[string match "*_panel_item" $name]} {return panel_item}
    return unknown
   }
   return var
@@ -422,8 +426,8 @@ proc var_type {name} {
 
 proc var_name {full_name} {
  set t [var_type $full_name]
- if {$t eq {panel_item_old}} {return [string range $i 0 end-3]}
- if {$t eq {panel_item}} {return [string range $i 0 end-11]}
+ if {$t eq {panel_item_old}} {return [string range $full_name 0 end-3]}
+ if {$t eq {panel_item}} {return [string range $full_name 0 end-11]}
  return $full_name
 }
 
@@ -431,7 +435,7 @@ proc panel_var {panel var} {
    if {[var_type $var] eq {panel_item_old}} {
      set ret {}
      set v [var_name $var]
-     for i in {en x y} {
+     foreach i {en x y} {
       set addr [expr {$::name2addr(${v}_${i}) + 250*$panel}]
       binary scan $::eep @${addr}cu val
       lappend ret $i $val
@@ -439,9 +443,9 @@ proc panel_var {panel var} {
      return $ret
    }
 
-   set addr [expr {$::name2addr($v) + 250*$panel}]
+   set addr [expr {$::name2addr($var) + 250*$panel}]
    binary scan $::eep @${addr}Su val
-   if {$val & 0x8000} {set en 1}
+   set en [expr {($val & 0x8000) != 0}]
    set ret [list en $en]
    lappend ret x [expr {($val>>8)&0x1f}]
    lappend ret y [expr {$val&0x0f}]
@@ -499,13 +503,7 @@ proc cfg_var {var} {
 }
 
 proc dump_panel_cfg {fd var_name} {
- set sps ""
-
  set var [var_name $var_name]
-
- for {set i [expr {18-[string length $var]}]} {$i != 0} {incr i -1} {
-    append sps " "
- }
 
  set en "-"
  for {set panel 0} {$panel < $::npanels} {incr panel} {
@@ -513,10 +511,10 @@ proc dump_panel_cfg {fd var_name} {
   if {$v(en)} {set en "+"}
   array unset v
  }
- puts -nonewline $fd "$en$var$sps"
+ puts -nonewline $fd [format "%s%-18s" $en $var]
  for {set panel 0} {$panel < $::npanels} {incr panel} {
   if {![cfg_var_valid $var $panel]} {
-    puts -nonewline $fd "-   0   0"
+    puts -nonewline $fd " -   0   0"
     continue
   }
   array set v [panel_var $panel $var_name]
@@ -576,11 +574,11 @@ proc set_var {f var val} {
    return
  }
  set addr $::name2addr($var)
- $::write_var $f $addr [binary format S $val]
+ $::write_var $f $addr [binary format c $val]
 }
 
-proc set_panel_var {f p var suffix val} {
- if {[info exits ::name2addr(${var}_en)]} {
+proc set_panel_var {f p var val} {
+ if {[info exists ::name2addr(${var}_en)]} {
   # old style format
   foreach {i j} $val {
    set addr $::name2addr(${var}_${i})
@@ -593,10 +591,10 @@ proc set_panel_var {f p var suffix val} {
  set vv [expr {($v(en)<<15) | $v(y) | ($v(x)<<8)}]
  set addr $::name2addr(${var}_panel_item)
  set addr [expr {$addr + $p*250}]
- $::write_var $f $addr [binary format c $vv]
+ $::write_var $f $addr [binary format S $vv]
 }
 
-if {[info exists fn]} {
+if {[info exists fn] && $op ne "writefw"} {
   set eeprom_access file
 } elseif {$serial_over_mav} {
   set eeprom_access mav
@@ -621,10 +619,24 @@ proc read_eeprom {fd} {
  return $ret
 }
 
+if {[info exists mav_sysid]} {
+  set osd::sysid $::mav_sysid
+  set bl_mav_needs_detect 0
+} else {
+ set bl_mav_needs_detect 1
+}
+
 proc bl_open_mav {timeout {min_timeout 20}} {
  set ::bl_cmd osd::bl_cmd
  set fd [mav::open_serial $::serial_port $::mav_baud]
  osd::bl_config [list dev $::mav_dev baud 57600 timeout_max 500 timeout_min 20]
+ if {$::bl_mav_needs_detect} {
+  if {![osd::detect $fd]} {
+   my_error "no heartbeats from osd"
+  }
+  verbose_msg "mavlink: detected osd with sysid $osd::sysid"
+  set bl_mav_needs_detect 0
+ }
  osd::reboot $fd
  if {![bl_check_sig $fd]} {
    osd::bl_exit $fd
@@ -637,7 +649,6 @@ proc bl_open_mav {timeout {min_timeout 20}} {
 if {$op eq "read"} {
  
  if {$eeprom_access eq "bl"} {
-  set bl_cmd bl_cmd_serial
   set fd [bl_connect]
   set eep [read_eeprom $fd]
   bl_exit $fd
@@ -668,15 +679,15 @@ if {$op eq "read"} {
   set ofd stdout
  }
  foreach i [lsort [array names name2addr]] {
-   set vt [var_type $i]
-   if {$vt ne {panel_item} && $vt ne {panel_item_old}} continue
-   dump_panel_cfg $ofd $var
-  }
-  foreach i [lsort [array names name2addr]] {
+  set vt [var_type $i]
+  if {$vt ne {panel_item} && $vt ne {panel_item_old}} continue
+  dump_panel_cfg $ofd $i
+ }
+ foreach i [lsort [array names name2addr]] {
    set vt [var_type $i]
    if {$vt ne {var}} continue
    dump_var $ofd $i
-  }
+ }
  if {$ofd ne "stdout"} {close $ofd}
 }
 
@@ -688,7 +699,6 @@ if {$op eq "write"} {
  }
  if {$noclear} {
   if {$eeprom_access eq "bl"} {
-   set bl_cmd bl_cmd_serial
    set f [bl_connect]
    set close_eep_fd bl_exit
    set write_var write_var_bl
@@ -733,7 +743,11 @@ if {$op eq "write"} {
     lappend v y [lindex $s $off]
     incr off
     set_panel_var $f $p $var $v
-    set pv_set(${var}_en) 1
+    if {[info exists name2addr(${var}_en)]} {
+     set pv_set(${var}_en) 1
+    } else {
+     set pv_set(${var}_panel_item) 1
+    }
    }
    if {!$noclear} {
     for {} {$p < $npanels} {incr p} {
@@ -1032,12 +1046,16 @@ if {$op eq "writefont"} {
 }
 
 if {$op eq "writefw"} {
+ set firmware [ihex_read_and_check $fwfn]
  if {!$serial_over_mav} {
-  exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
+  #exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
+  set bl_cmd bl_cmd_serial
+  set bl_fd [bl_connect]
+  bl_write_flash $bl_fd $firmware
+  bl_exit $bl_fd
  } else {
-    set firmware [ihex_read_and_check $fwfn]
-    set bl_fd [bl_open_mav 1000 100]
-    bl_write_flash $bl_fd $firmware
-    bl_exit $bl_fd
+  set bl_fd [bl_open_mav 1000 100]
+  bl_write_flash $bl_fd $firmware
+  bl_exit $bl_fd
  }
 }
