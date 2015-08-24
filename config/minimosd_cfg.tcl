@@ -635,7 +635,7 @@ proc read_eeprom {fd} {
 if {[info exists mav_sysid]} {
   set osd::sysid $::mav_sysid
   set bl_mav_needs_detect 0
-  if {[info exists $mav_osd_baud]} {set osd::restore_baud $mav_osd_baud}
+  if {[info exists mav_osd_baud]} {set osd::restore_baud $mav_osd_baud}
 } else {
  set bl_mav_needs_detect 1
 }
@@ -643,7 +643,6 @@ if {[info exists mav_sysid]} {
 proc bl_open_mav {timeout {min_timeout 20}} {
  set ::bl_cmd osd::bl_cmd
  set fd [mav::open_serial $::serial_port $::mav_baud]
- osd::bl_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
  if {$::bl_mav_needs_detect} {
   if {![osd::detect $fd]} {
    my_error "no heartbeats from osd"
@@ -652,6 +651,7 @@ proc bl_open_mav {timeout {min_timeout 20}} {
   set bl_mav_needs_detect 0
  }
  osd::reboot $fd
+ osd::bl_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
  if {![bl_check_sig $fd]} {
    osd::bl_exit $fd
    my_error "failed to contact bootloader"
