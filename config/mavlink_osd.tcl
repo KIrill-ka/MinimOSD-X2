@@ -2,6 +2,7 @@ namespace eval osd {
 
 set sysid 97
 set compid 94
+set restore_baud 0
 
 proc timeout_set {t} {
  set e [clock milliseconds]
@@ -27,10 +28,14 @@ proc detect {fd {timeout 10000}} {
   mav::send_hb $fd
   set hb [mav::wait_for_msg $fd 0 $w]
   if {$hb eq {}} continue
-  binary scan $hb "@10cu" type
+  binary scan $hb "@6iucu" custom_mode type 
   if {$type == 24} break
  }
  binary scan $hb "@3cucu" osd::sysid osd::compid
+ set b [expr {($custom_mode >> 16) & 0xff}]
+ if {$b == 115} {
+  set osd::restore_baud 115200
+ } elseif {$b == 57} {set osd::restore_baud 57600}
  return 1
 }
 
@@ -42,7 +47,7 @@ proc reboot {fd} {
 set serial_speed 0
 
 array set config {
- dev 0
+ chan 0
  baud 0
  timeout_min 20
  timeout_max 600
@@ -74,7 +79,7 @@ proc bl_cmd {fd data resp_len} {
    set b $osd::config(baud)
    set osd::serial_speed $b
   }
-  mav::send_serial $fd $b $osd::config(timeout_min) $osd::config(dev) $opts $d
+  mav::send_serial $fd $b $osd::config(timeout_min) $osd::config(chan) $opts $d
  }
  set end [expr {[clock milliseconds]+$osd::config(timeout_max)}]
  set repl {}
@@ -85,7 +90,7 @@ proc bl_cmd {fd data resp_len} {
    if {[clock milliseconds] > $end} {return $repl}
    set opts {EXCLUSIVE BLOCKING RESPOND} 
    if {$resp_len > 70} {lappend opts MULTI}
-   mav::send_serial $fd 0 $osd::config(timeout_min) $osd::config(dev) $opts {}
+   mav::send_serial $fd 0 $osd::config(timeout_min) $osd::config(chan) $opts {}
   }
   binary scan $m "@14cu" n
   binary scan $m "@15a$n" r
@@ -99,7 +104,7 @@ proc bl_cmd {fd data resp_len} {
 
 proc bl_exit {fd} {
  # exit exclusive mode
- mav::send_serial $fd $osd::config(baud) 0 $osd::config(dev) {} {}
+ mav::send_serial $fd $osd::restore_baud 0 $osd::config(chan) {} {}
 }
 
 proc test {} {

@@ -32,6 +32,9 @@ static void process_command(mavlink_message_t *msg)
                   break;
                  }
                  cli();
+                 UCSR0B = 0;
+                 UCSR0A = 0; /* bootloader doesn't clear U2X0 flag, we might use this feature
+                                to run bootloader @115200 */
                  asm volatile ("jmp 0x7800"); /* call bootloader */
                  break;
  }
@@ -179,7 +182,9 @@ void read_mavlink()
         if(ms > mav_beat_timer + MAV_BEAT_INTERVAL) {
          mav_beat_timer = ms;
          mavlink_msg_heartbeat_send(MAVLINK_COMM_0, 24 /*dev type MAV_TYPE*/, 0 /* AP class MAV_AUTOPILOT */, 
-                         0 /* MAV_MODE_FLAGS */, osd_statf /* custom mode */, 0 /* MAV_STATE */);
+             0 /* MAV_MODE_FLAGS */, 
+             (uint32_t)osd_statf | ((uint32_t)eeprom_read_byte((uint8_t*)MAV_BAUD_ADDR)<<16) /* custom mode */,
+             0 /* MAV_STATE */);
         }
 
         n_bytes = Serial.available();

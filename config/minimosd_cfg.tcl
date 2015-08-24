@@ -143,12 +143,20 @@ proc usage {code} {
  if {$code == 0} {set f stdout} else {set f stderr}
  set me minimosd_cfg
  puts $f "$me: usage"
- puts $f "\t$me write \[-P <serial_port>] \[-eep <eeprom_file>] \[-cf <config_file>]"
- puts $f "\t$me read \[-P <serial_port>] \[-eep <eeprom_file>] \[-cf <config_file>]"
+ puts $f "\t$me write \[connection_options\] \[-eep <eeprom_file>] \[-cf <config_file>]"
+ puts $f "\t$me read \[connection_options\] \[-eep <eeprom_file>] \[-cf <config_file>]"
  puts $f "\t$me mcm2fnt \[-mcm <mcm_file>] \[-fnt <fnt_file>]"
  puts $f "\t$me fnt2mcm \[-mcm <mcm_file>] \[-fnt <fnt_file>]"
- puts $f "\t$me writefont \[-P <serial_port>] \[{-mcm <mcm_file> | -fnt <fnt_file>}]"
- puts $f "\t$me writefw \[-P <serial_port>] -fw <hex_file>"
+ puts $f "\t$me writefont \[-P <serial_port>\] \[{-mcm <mcm_file> | -fnt <fnt_file>}]"
+ puts $f "\t$me writefw \[connection_options\] -fw <hex_file>"
+ puts $f ""
+ puts $f "connection options:"
+ puts $f "\t-P <serial_port>\tserial port device name for bootloader/mavlink connection"
+ puts $f "\t-mav\tattempt to use mavlink serial port forwarding for bootloader connection"
+ puts $f "\t-mav_baud <br>\tport speed for mavlink connection to autopilot"
+ puts $f "\t-mav_osd_baud <br>\tport speed for connection between autopilot and OSD"
+ puts $f "\t-mav_sysid <id>\tmavlink system id assigned to autopilot/OSD"
+ puts $f "\t-mav_chan <chan_id>\tautopilot mavlink channel id where OSD is connected"
  exit $code
 }
 
@@ -158,7 +166,7 @@ proc my_error {msg} {
 }
 
 set op ""
-if {![info exists mav_dev]} {set mav_dev 0}
+if {![info exists mav_chan]} {set mav_chan 0}
 if {![info exists verbose]} {set verbose 0}
 if {![info exists noclear]} {set noclear 0}
 
@@ -174,8 +182,9 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-verbose" {set verbose 1; set mav::verbose 1}
   "-mav" {set serial_over_mav 1}
   "-mav_baud" {incr i; set mav_baud [lindex $argv $i]}
-  "-mav_dev" {incr i; set mav_dev [lindex $argv $i]}
-  "-mav_sysid" {incr i; set mav_sysid [lindex $argv $i]}
+  "-mav_chan" {incr i; set mav_chan [lindex $argv $i]}
+  "-mav_osd_sysid" {incr i; set mav_sysid [lindex $argv $i]}
+  "-mav_osd_baud" {incr i; set mav_osd_baud [lindex $argv $i]}
   "help" {usage 0}
   "write" -
   "read" -
@@ -207,7 +216,11 @@ if {![info exists mav_baud]} {
  if {$serial_over_mav} {
   set mav_baud 115200
  } else {
-  set mav_baud 57600
+  if {[info exists mav_osd_baud]} {
+   set mav_baud $mav_osd_baud
+  } else {
+   set mav_baud 57600
+  }
  }
 }
 
@@ -622,6 +635,7 @@ proc read_eeprom {fd} {
 if {[info exists mav_sysid]} {
   set osd::sysid $::mav_sysid
   set bl_mav_needs_detect 0
+  if {[info exists $mav_osd_baud]} {set osd::restore_baud $mav_osd_baud}
 } else {
  set bl_mav_needs_detect 1
 }
@@ -629,12 +643,12 @@ if {[info exists mav_sysid]} {
 proc bl_open_mav {timeout {min_timeout 20}} {
  set ::bl_cmd osd::bl_cmd
  set fd [mav::open_serial $::serial_port $::mav_baud]
- osd::bl_config [list dev $::mav_dev baud 57600 timeout_max 500 timeout_min 20]
+ osd::bl_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
  if {$::bl_mav_needs_detect} {
   if {![osd::detect $fd]} {
    my_error "no heartbeats from osd"
   }
-  verbose_msg "mavlink: detected osd with sysid $osd::sysid"
+  verbose_msg "mavlink: detected osd with sysid $osd::sysid, baudrate $osd::restore_baud"
   set bl_mav_needs_detect 0
  }
  osd::reboot $fd
@@ -642,7 +656,7 @@ proc bl_open_mav {timeout {min_timeout 20}} {
    osd::bl_exit $fd
    my_error "failed to contact bootloader"
  }
- osd::bl_config [list dev $::mav_dev baud 57600 timeout_max $timeout timeout_min $min_timeout]
+ osd::bl_config [list chan $::mav_chan baud 57600 timeout_max $timeout timeout_min $min_timeout]
  return $fd
 }
 
