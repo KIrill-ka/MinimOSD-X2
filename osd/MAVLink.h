@@ -72,7 +72,7 @@ void read_mavlink()
             case MAVLINK_MSG_ID_HEARTBEAT:
                 {
                     uint8_t type = mavlink_msg_heartbeat_get_autopilot(&msg);
-                    if(type == MAV_TYPE_GCS || type == MAV_TYPE_ANTENNA_TRACKER) break;
+                    if(type == MAV_AUTOPILOT_INVALID) break;
                     if(mavlink_system.sysid == 97) mavlink_system.sysid = msg.sysid;
                     osd_mode = (uint8_t)mavlink_msg_heartbeat_get_custom_mode(&msg);
                 }
