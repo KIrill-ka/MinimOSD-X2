@@ -651,6 +651,12 @@ proc bl_open_mav {timeout {min_timeout 20}} {
   set bl_mav_needs_detect 0
  }
  osd::reboot $fd
+
+ # Let it transmit the command before changing speed.
+ # Command ack might work better, but then we'd have
+ # to ignore missing ack in case of interrupted firmware flash.
+ after 100
+
  osd::bl_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
  if {![bl_check_sig $fd]} {
    osd::bl_exit $fd
