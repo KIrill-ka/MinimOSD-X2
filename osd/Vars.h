@@ -77,6 +77,10 @@ static unsigned long         osd_switch_time = 0;
 static float        palt = 0;
 static float        osd_climb = 0;
 
+static float        climb_eff_alt_start = 0;
+static float        climb_eff_alt_prev = 0;
+static float        climb_eff_mah_used_start = 0;
+
 static float        osd_lat = 0;                    // latidude
 static float        osd_lon = 0;                    // longitude
 static uint8_t      osd_satellites_visible = 0;     // number of satelites
@@ -136,6 +140,8 @@ static uint8_t      osd_statf = 0;
 #define TRIG100MS_F1         1
 #define TICK100_F1           2
 #define EFF_RESET_GLIDE_F1   4
+#define CLIMB_EFF_DET_F1     8
+#define CLIMB_EFF_VALID_F1   16
 static uint8_t      osd_statf1 = 0;
 
 

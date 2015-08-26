@@ -266,16 +266,43 @@ void panEff(int first_col, int first_line){
 
 void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
 {
- float eff;
-        
+ float alt = osd_alt_to_home;
+ float e;
+ uint8_t f = osd_statf1;
  osd.setPanel(x, y);
- if(osd_climb < 1) {
-  osd.printf_P(PSTR("%c"), 0x16);
-  return;
+
+ if(osd_statf & TRIG1S_F) {
+  if(!(f & CLIMB_EFF_DET_F1)) {
+   /* climb detection: check that altitude grows for one second */
+   f |= CLIMB_EFF_DET_F1;
+   climb_eff_alt_prev = alt;
+   climb_eff_alt_start = alt;
+   climb_eff_mah_used_start = mah_used;
+  } else {
+   f |= CLIMB_EFF_VALID_F1;
+  }
+ } 
+ 
+ if(alt < climb_eff_alt_prev) {
+  f &= ~CLIMB_EFF_DET_F1;
+  f &= ~CLIMB_EFF_VALID_F1;
  }
- eff = osd_curr_A * (10.0f / 3.6f) / osd_climb; /* mA / km/h = mAh / km */
- if (eff <= 9999 && eff >= -999) 
-     osd.printf_P(PSTR("%c%4.0f%c"), 0x16, eff, 0x01);
+ osd_statf1 = f;
+ climb_eff_alt_prev = alt;
+
+ if((f & CLIMB_EFF_VALID_F1)) {
+  if(alt > climb_eff_alt_start) {
+    e = (mah_used - climb_eff_mah_used_start) * 1000 / (alt - climb_eff_alt_start);
+    if (e > 9999) e = 9999;
+    else if(e < -999) e = -999; /* negative current... */
+  } else {
+    e = 9999; /* alt statys at 0 */
+  }
+  osd.printf_P(PSTR("%c%4.0f%c"), 0x16, e, 0x01);
+ } else {
+  osd.printf_P(PSTR("%c"), 0x16);
+ }
+
 }
 
 /* **************************************************************** */
