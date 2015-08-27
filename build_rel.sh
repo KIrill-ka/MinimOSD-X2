@@ -23,4 +23,5 @@ cp minimosd_cfg minimosd_cfg.tcl
 ../../../freewrap/linux64/freewrapTCLSH -w ../../../freewrap/win32/freewrapTCLSH.exe minimosd_cfg.tcl
 rm minimosd_cfg.tcl
 cd ..
+rm MinimOSDx2-$ver.zip
 zip -r MinimOSDx2-$ver.zip MinimOSDx2-$ver
