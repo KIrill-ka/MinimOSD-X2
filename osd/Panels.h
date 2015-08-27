@@ -272,7 +272,7 @@ void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
  osd.setPanel(x, y);
 
  if(osd_statf & TRIG1S_F) {
-  if(!(f & CLIMB_EFF_DET_F1)) {
+  if(!(f & CLIMB_EFF_DET_F1) || alt - climb_eff_alt_start < 1) {
    /* climb detection: check that altitude grows for one second */
    f |= CLIMB_EFF_DET_F1;
    climb_eff_alt_prev = alt;
