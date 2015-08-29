@@ -402,7 +402,6 @@ proc bl_exit {fd} {
  $::bl_cmd $fd [binary format a10 ??????????] 0
 
  if {$::eeprom_access eq "bl"} {
-  bl_cmd_serial $fd "j" 0
   close $fd
  } else {
   osd::bl_exit $fd
@@ -956,16 +955,19 @@ if {$op eq "fnt2mcm"} {
  if {$ifd ne "stdin"} {close $ifd}
 }
 
-proc get_font_loader_resp {fd buf resp} {
+proc get_font_loader_resp {fd buf resp skip_start} {
  upvar $buf mybuf
  set b [read $fd 1]
  if {$b eq ""} {return "timeout"}
  append mybuf $b
- if {[string compare -length [string length $mybuf] $mybuf $resp] != 0} {
+ if {[string first $resp $mybuf] < 0} {
+  if {!$skip_start && [string length $mybuf] == [string length $resp]} {
    my_error "unexpected response from font loader"
+  } else {
+   return "nextch"
+  }
  }
- if {$mybuf eq $resp} {return "ok"}
- return "nextch"
+ return "ok"
 }
 
 if {$op eq "writefont"} {
@@ -992,8 +994,8 @@ if {$op eq "writefont"} {
  if {$fl_en eq ""} {
   my_error "no response from bootloader"
  }
- set mav_baud [bl_read_eep_num $ofd $name2addr(MAV_BAUD) 1]
- if {$fl_en eq ""} {
+ set mav_baud [bl_read_eep_num $ofd $name2addr(MAV_BAUD)]
+ if {$mav_baud eq ""} {
   my_error "no response from bootloader"
  }
  if {!$fl_en} {
@@ -1018,7 +1020,7 @@ if {$op eq "writefont"} {
   puts $ofd ""
   puts $ofd ""
   puts $ofd ""
-  set r [get_font_loader_resp $ofd resp "Ready for Font\n"]
+  set r [get_font_loader_resp $ofd resp "Ready for Font\n" 1]
   if {$r eq "ok"} break
   if {$r eq "nextch"} continue
   incr timeou -1
@@ -1042,7 +1044,7 @@ if {$op eq "writefont"} {
   set resp ""
   set timeo 10
   while {1} {
-   set r [get_font_loader_resp $ofd resp "Char Done\n"]
+   set r [get_font_loader_resp $ofd resp "Char Done\n" 0]
    if {$r eq "ok"} break
    if {$r eq "nextch"} continue
    incr timeo -1
