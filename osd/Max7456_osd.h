@@ -82,7 +82,6 @@ class OSD: public BetterStream
     OSD(void);
     void init(bool new_cfg);
     void clear(void);
-    void plug(void);
     void setPanel(uint8_t start_col, uint8_t start_row);
     void control(uint8_t ctrl);
     void detectMode(void);

@@ -7,8 +7,7 @@ void uploadFont()
     uint8_t char_data = 0;
     char b;
 
-    osd.clear();
-
+    osd.control(0);
     Serial.printf_P(PSTR("Ready for Font\n"));
 
     while(1) { 
@@ -25,7 +24,10 @@ void uploadFont()
             if(char_byte == 54) osd.char_write_end();
             else if(char_byte == 64) {
              Serial.printf_P(PSTR("Char Done\n"));
-             if(char_num == 255) return;
+             if(char_num == 255) {
+              osd.control(1);
+              return;
+             }
              char_num++;
              char_byte = 0;
             }

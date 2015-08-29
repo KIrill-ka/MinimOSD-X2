@@ -14,6 +14,24 @@
 
 #define HW_VSYNC
 
+static void write_reg(uint8_t addr, uint8_t val)
+{
+ PORTD &= ~_BV(PD6);
+ Spi.transfer(addr);
+ Spi.transfer(val);
+ PORTD |= _BV(PD6);
+}
+
+static uint8_t read_reg(uint8_t addr)
+{
+ uint8_t v;
+ PORTD &= ~_BV(PD6);
+ Spi.transfer(addr);
+ v = Spi.transfer(0xff);
+ PORTD |= _BV(PD6);
+ return v;
+}
+
 OSD::OSD()
 {
 }
@@ -51,15 +69,9 @@ void OSD::init(bool new_cfg)
 
   if(new_cfg) {
    offset = EEPROM.read(VOFFSET_ADDR);
-   PORTD &= ~_BV(PD6);
-   Spi.transfer(MAX7456_VOS_reg); // 5 valid bits
-   Spi.transfer(offset);
-   PORTD |= _BV(PD6);
+   write_reg(MAX7456_VOS_reg, offset); // 5 valid bits
    offset = EEPROM.read(HOFFSET_ADDR);
-   PORTD &= ~_BV(PD6);
-   Spi.transfer(MAX7456_HOS_reg); // 6 valid bits
-   Spi.transfer(offset);
-   PORTD |= _BV(PD6);
+   write_reg(MAX7456_HOS_reg, offset); // 6 valid bits
   }
   memset(osdbuf, ' ', sizeof(osdbuf)-1);
   osdbuf[sizeof(osdbuf)-1] = MAX7456_END_string;
@@ -156,26 +168,12 @@ int OSD::getCenter()
   return video_center; //first line for center panel
 }
 
-//------------------ plug ---------------------------------------------------
-
-void OSD::plug()
-{
-  digitalWrite(MAX7456_SELECT,LOW);
-}
-
-//------------------ clear ---------------------------------------------------
 
 void OSD::clear()
 {
-  // clear the screen
-  digitalWrite(MAX7456_SELECT,LOW);
-  Spi.transfer(MAX7456_DMM_reg);
-  Spi.transfer(MAX7456_CLEAR_display);
-  digitalWrite(MAX7456_SELECT,HIGH);
+  write_reg(MAX7456_DMM_reg, MAX7456_CLEAR_display);
   // FIXME: wait for clear to complete
 }
-
-//------------------ set panel -----------------------------------------------
 
 void
 OSD::setPanel(uint8_t st_col, uint8_t st_row){
@@ -254,43 +252,18 @@ uint8_t OSD::checkVsync() {
 }
 
 void
-OSD::control(uint8_t ctrl){
-  digitalWrite(MAX7456_SELECT,LOW);
-  Spi.transfer(MAX7456_VM0_reg);
-  switch(ctrl){
-    case 0:
-      Spi.transfer(video_mode); // disable display
-      break;
-    case 1:
-      //Spi.transfer((MAX7456_ENABLE_display_vert | video_mode) | MAX7456_SYNC_internal);
-      //Spi.transfer((MAX7456_ENABLE_display_vert | video_mode) | MAX7456_SYNC_external);
-      Spi.transfer(MAX7456_ENABLE_display_vert | video_mode | MAX7456_SYNC_autosync); 
-      break;
-  }
-  digitalWrite(MAX7456_SELECT,HIGH);
+OSD::control(uint8_t ctrl)
+{
+  uint8_t val;
+
+  val = video_mode;
+  if(ctrl) val |= MAX7456_ENABLE_display_vert | MAX7456_SYNC_autosync;
+  write_reg(MAX7456_VM0_reg, val);
 }
 
-static void write_reg(uint8_t addr, uint8_t val)
-{
- PORTD &= ~_BV(PD6);
- Spi.transfer(addr);
- Spi.transfer(val);
- PORTD |= _BV(PD6);
-}
-
-static uint8_t read_reg(uint8_t addr)
-{
- uint8_t v;
- PORTD &= ~_BV(PD6);
- Spi.transfer(addr);
- v = Spi.transfer(0xff);
- PORTD |= _BV(PD6);
- return v;
-}
 
 void OSD::char_write_start(uint8_t char_n)
 {
- write_reg(MAX7456_VM0_reg, 0);
  write_reg(MAX7456_CMAH_reg, char_n);
 }
 
@@ -304,7 +277,6 @@ void OSD::char_write_end()
 {
  write_reg(MAX7456_CMM_reg, WRITE_nvr);
  while(read_reg(MAX7456_STAT_reg_read) & STATUS_reg_nvr_busy);
- write_reg(MAX7456_VM0_reg, MAX7456_ENABLE_display_vert|MAX7456_SYNC_autosync|video_mode);
 }
 
 //------------------ pure virtual ones (just overriding) ---------------------
