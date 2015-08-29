@@ -235,6 +235,9 @@ proc bl_connect {} {
  fconfigure $ofd -ttycontrol {DTR 1}
  fconfigure $ofd -ttycontrol {DTR 0}
  after 500
+ fconfigure $ofd -blocking 0
+ read $ofd
+ fconfigure $ofd -blocking 1
  set ::bl_cmd bl_cmd_serial
  return $ofd
 }
@@ -336,7 +339,7 @@ proc bl_write_mem {ofd memtype addr data {verify 0}} {
 
 proc bl_write_eep_num {fd addr byte {verify 0}} {
  set d [binary format c $byte]
- return [bl_write_mem $fd EEPROM $addr $d $verify
+ return [bl_write_mem $fd EEPROM $addr $d $verify]
 }
 
 proc bl_write_flash_page {fd addr data} {
@@ -1061,9 +1064,9 @@ if {$op eq "writefont"} {
   puts -nonewline "Disabling font loader: "
   flush stdout
   set ofd [bl_connect]
-  bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 0
+  set r [bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 0]
   bl_exit $ofd
-  puts done.
+  if {$r} {puts done.} else {puts failed.}
  }
 }
 
