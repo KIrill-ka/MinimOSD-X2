@@ -52,14 +52,17 @@ void read_mavlink()
         uint8_t c = Serial.read();
 
         ms = millis();
-        if (lf_count >= 0 && ms < 20000 && ms > 5000) {
-            if (c == '\n') lf_count++;
-            else if (c != '\r')  lf_count = 0;
+        if(lf_count >= 0) {
+         if(ms > 20000) lf_count = -1;
+         else if(ms > 5000) {
+            if(c == '\n') lf_count++;
+            else if(c != '\r') lf_count = 0;
 
             if (lf_count == 3) {
              lf_count = -1;
              uploadFont();
             }
+         }
         }
 
         if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status)) {
