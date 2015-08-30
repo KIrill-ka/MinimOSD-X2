@@ -20,11 +20,28 @@ void panLogo()
     osd.update();
 }
 
+#ifdef OSD_DEBUG_SHOW_FONT
+static void showFont()
+{
+ uint8_t x, y, ch;
+ for(ch = 0, x = 2, y = 2; ch < 255; ch++) {
+  if(x == 2) osd.setPanel(x, y);
+  osd.write(ch);
+  if(++x == 27) { y++; x = 2; }
+ }
+}
+#endif
+
 void writePanels()
 { 
   int8_t show_fdata;
   int8_t p;
   uint32_t ms;
+
+#ifdef OSD_DEBUG_SHOW_FONT
+  showFont();
+  return;
+#endif
 
   ms = millis();
   if (takeofftime == 1 && (osd_alt_to_home > 10 || osd_groundspeed > 1 || osd_throttle > 1 || osd_home_distance > 100)) {
@@ -124,19 +141,13 @@ void writePanels()
     }
   }
   timers();
-    // OSD debug for development (Shown on top-middle panels) 
-#ifdef membug
-    osd.setPanel(13,4);
-    osd.printf_P(PSTR("%i"),freeMem()); 
+#ifdef OSD_DEBUG_SHOW_UPDATE_MS
+  osd.setPanel (13, 4);
+  osd.printf_P(PSTR("%u"),(unsigned) (millis()-ms)); 
 #endif
-  
-
 }
-/******* PANELS - DEFINITION *******/
 
-/* **************************************************************** */
-
- // Panel  : COG Course Over Ground
+// Panel  : COG Course Over Ground
 // Needs  : X, Y locations
 // Output : 
 // Size   : 

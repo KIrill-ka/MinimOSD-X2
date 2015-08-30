@@ -53,16 +53,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>
 */
 
 #define isPAL 1
-//#define membug 
-//#define FORCEINIT  // You should never use this unless you know what you are doing 
-
-//OSD Hardware 
-//#define ArduCAM328
-#define MinimOSD
 
 #include <FastSerial.h>
 #include <AP_Common.h>
-//#include <AP_Math.h>
 #include <math.h>
 #include <inttypes.h>
 #include <avr/pgmspace.h>
@@ -75,10 +68,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>
 #endif
 #include <EEPROM.h>
 #include <GCS_MAVLink.h>
-
-#ifdef membug
-#include <MemoryFree.h>
-#endif
 
 #ifdef OSD_RUSSIAN
 #include "strings_ru.h"
@@ -99,9 +88,6 @@ OSD osd;
 
 void setup() 
 {
-#ifdef ArduCAM328
-    pinMode(10, OUTPUT); // USB ArduCam Only
-#endif
 	if(eeprom_read_byte((uint8_t*)VER_NEW_ADDR) == VER_NEW)
      osd_statf |= NEW_CFG_F;
     if((osd_statf & NEW_CFG_F) != 0
@@ -111,42 +97,12 @@ void setup()
     // setup mavlink port
     mavlink_comm_0_port = &Serial;
 
-#ifdef membug
-    Serial.println(freeMem());
-#endif
-
-#ifdef ArduCAM328
-    digitalWrite(10,  HIGH); // unplug USB HOST: ArduCam Only
-#endif
     // Prepare OSD for displaying 
     osd.init((osd_statf & NEW_CFG_F) != 0);
 
     // Start 
     startPanels();
     delay(500);
-
-    // OSD debug for development (Shown at start)
-#ifdef membug
-    osd.setPanel(1,1);
-    osd.openPanel();
-    osd.printf("%i",freeMem()); 
-    osd.closePanel();
-#endif
-
-    // Just to easy up development things
-#ifdef FORCEINIT
-    InitializeOSD();
-#endif
-
-    // Check EEPROM to see if we have initialized it already or not
-    // also checks if we have new version that needs EEPROM reset
-//    if(readEEPROM(CHK1) + readEEPROM(CHK2) != VER) {
-//        osd.setPanel(6,9);
-//        osd.openPanel();
-//        osd.printf_P(PSTR("Missing/Old Config")); 
-//        osd.closePanel();
-        //InitializeOSD();
-//    }
 
     // Get correct panel settings from EEPROM
     readSettings();
@@ -161,33 +117,12 @@ void setup()
 void loop() 
 {
 
-    /*if(enable_mav_request == 1){//Request rate control
-        //osd.clear();
-        //osd.setPanel(3,10);
-        //osd.openPanel();
-        //osd.printf_P(PSTR("Requesting DataStreams...")); 
-        //osd.closePanel();
-        //for(int n = 0; n < 3; n++){
-        //    request_mavlink_rates();//Three times to certify it will be readed
-        //    delay(50);
-        //}
-        enable_mav_request = 0;
-        //delay(2000);
-        osd.clear();
-        waitingMAVBeats = 0;
-        lastMAVBeat = millis();//Preventing error from delay sensing
-    }*/
-    
-
-    //Run "timer" every 120 miliseconds
     if((osd_statf & (NEW_DATA_F|SCREEN_UP_F)) == NEW_DATA_F || millis() > mavLinkTimer + 120) {
       mavLinkTimer = millis();
       setHeadingPatern();  // generate the heading patern
-      //  osd_battery_pic_A = setBatteryPic(osd_battery_remaining_A);     // battery A remmaning picture
-      //  osd_battery_pic_B = setBatteryPic(osd_battery_remaining_B);     // battery B remmaning picture
       setHomeVars();   // calculate and set Distance from home and Direction to home
       setFdataVars();
-      writePanels();   // writing enabled panels (check OSD_Panels Tab)
+      writePanels();
       osd_statf |= SCREEN_UP_F;
       osd_statf &= ~NEW_DATA_F;
     }
