@@ -309,9 +309,9 @@ void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
   } else {
     e = 9999; /* alt statys at 0 */
   }
-  osd.printf_P(PSTR("%c%4.0f%c"), 0x16, e, 0x01);
+  osd.printf_P(PSTR("%c%4.0f%c"), '\xb6', e, '\x01');
  } else {
-  osd.printf_P(PSTR("%c"), 0x16);
+  osd.printf_P(PSTR("%c"), '\xb6');
  }
 
 }
@@ -769,7 +769,7 @@ void panRoll(int first_col, int first_line){
 void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags)
 {
     osd.setPanel(x, y);
-    osd.printf_P(PSTR("%5.2f%c"), (float)osd_battb_volt/1000.0f, 0x0d);
+    osd.printf_P(PSTR("%5.2f%c"), (float)osd_battb_volt/1000.0f, '\xb5');
 }
 
 /* **************************************************************** */
