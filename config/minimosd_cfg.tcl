@@ -183,7 +183,7 @@ for {set i 0} {$i < [llength $argv]} {incr i} {
   "-mav" {set serial_over_mav 1}
   "-mav_baud" {incr i; set mav_baud [lindex $argv $i]}
   "-mav_chan" {incr i; set mav_chan [lindex $argv $i]}
-  "-mav_osd_sysid" {incr i; set mav_sysid [lindex $argv $i]}
+  "-mav_sysid" {incr i; set mav_sysid [lindex $argv $i]}
   "-mav_osd_baud" {incr i; set mav_osd_baud [lindex $argv $i]}
   "help" {usage 0}
   "write" -
@@ -261,8 +261,8 @@ proc bl_read_mem1 {ofd memtype addr len} {
  } else {
   set trim 1
  }
- set addr [expr {$addr/2}]
- set resp [$::bl_cmd $ofd [binary format "asa" U $addr " "] 2]
+ set a [expr {$addr/2}]
+ set resp [$::bl_cmd $ofd [binary format "asa" U $a " "] 2]
  binary scan $resp "H*" r
  if {$r ne "1410"} {
   verbose_msg "bootloader: reading $memtype @$addr: bad responce for address set command ($r)"
@@ -407,7 +407,7 @@ proc bl_exit {fd} {
  if {$::eeprom_access eq "bl"} {
   close $fd
  } else {
-  osd::bl_exit $fd
+  osd::serial_fwd_exit $fd
   mav::close_serial $fd
  }
 }
@@ -642,16 +642,21 @@ if {[info exists mav_sysid]} {
  set bl_mav_needs_detect 1
 }
 
-proc bl_open_mav {timeout {min_timeout 20}} {
- set ::bl_cmd osd::bl_cmd
+proc osd_open_mav {} {
  set fd [mav::open_serial $::serial_port $::mav_baud]
  if {$::bl_mav_needs_detect} {
   if {![osd::detect $fd]} {
    my_error "no heartbeats from osd"
   }
   verbose_msg "mavlink: detected osd with sysid $osd::sysid, baudrate $osd::restore_baud"
-  set bl_mav_needs_detect 0
+  set ::bl_mav_needs_detect 0
  }
+ return $fd
+}
+
+proc bl_open_mav {timeout {min_timeout 20}} {
+ set ::bl_cmd osd::serial_fwd_data
+ set fd [osd_open_mav]
  osd::reboot $fd
 
  # Let it transmit the command before changing speed.
@@ -659,12 +664,12 @@ proc bl_open_mav {timeout {min_timeout 20}} {
  # to ignore missing ack in case of interrupted firmware flash.
  after 100
 
- osd::bl_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
+ osd::serial_fwd_config [list chan $::mav_chan baud 57600 timeout_max 500 timeout_min 20]
  if {![bl_check_sig $fd]} {
-   osd::bl_exit $fd
+   osd::serial_fwd_exit $fd
    my_error "failed to contact bootloader"
  }
- osd::bl_config [list chan $::mav_chan baud 57600 timeout_max $timeout timeout_min $min_timeout]
+ osd::serial_fwd_config [list chan $::mav_chan baud 57600 timeout_max $timeout timeout_min $min_timeout]
  return $fd
 }
 
@@ -960,9 +965,13 @@ if {$op eq "fnt2mcm"} {
 
 proc get_font_loader_resp {fd buf resp skip_start} {
  upvar $buf mybuf
- set b [read $fd 1]
+ #set b [read $fd 1]
+ set b [$::fl_read $fd [string length $resp]]
  if {$b eq ""} {return "timeout"}
  append mybuf $b
+ #binary scan $mybuf H* b1
+ #binary scan $resp H* b2
+ #puts "cmp $mybuf $b1 $resp $b2"
  if {[string first $resp $mybuf] < 0} {
   if {!$skip_start && [string length $mybuf] == [string length $resp]} {
    my_error "unexpected response from font loader"
@@ -973,81 +982,118 @@ proc get_font_loader_resp {fd buf resp skip_start} {
  return "ok"
 }
 
+proc fl_read_serial {fd max_len} {
+ return [read $fd 1]
+}
+
+proc fl_write_serial {fd data} {
+ puts -nonewline $fd $data
+}
+
+proc fl_read_mav {fd max_len} {
+ set x [osd::serial_fwd_data $fd "" $max_len]
+ #puts "resp $x"
+ return $x
+}
+
+proc fl_write_mav {fd data} {
+ #puts "fl_write_mav: $data"
+ return [osd::serial_fwd_data $fd $data 0]
+}
+
 if {$op eq "writefont"} {
- if {$serial_over_mav} {
-  my_error "font loading via mavlink is not implemented yet"
- }
  if {[info exists fnt_file]} {
   set ifd [open $fnt_file r]
   set font_format "fnt"
   set fnt [read_fnt $ifd]
- } elseif {[info exists mcm_file]} {
+  close $ifd
+ } else {
+  if {![info exists mcm_file]} {
+   set ifd stdin
+  }
   set ifd [open $mcm_file r]
   set header [gets $ifd]
   if {$header ne "MAX7456"} {
    my_error "$mcm_file doesn't look like mcm"
   }
-  set font_format "mcm"
- } else {
-  set ifd stdin
-  set font_format "fnt"
- }
- set ofd [bl_connect]
- set fl_en [bl_read_eep_num $ofd $name2addr(FONT_LOADER_ON)]
- if {$fl_en eq ""} {
-  my_error "no response from bootloader"
- }
- set mav_baud [bl_read_eep_num $ofd $name2addr(MAV_BAUD)]
- if {$mav_baud eq ""} {
-  my_error "no response from bootloader"
- }
- if {!$fl_en} {
-  puts -nonewline "Enabling font loader: "
-  flush stdout
-  if {![bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 1]} {
-   my_error "write to eeprom failed"
+  set fnt {}
+  for {set char 0} {$char < 256} {incr char} {
+   set cx {}
+   for {set byte 0} {$byte < 64} {incr byte} {
+    lappend cx [gets $ifd]
+   }
+   lappend fnt $cx
   }
-  puts done.
+  if {$ifd ne "stdin"} {close $ifd}
+  set font_format "mcm"
  }
- bl_exit $ofd
- if {$mav_baud == 115} {set mav_baud 115200} else {set mav_baud 57600}
- set ofd [open $serial_port r+]
- fconfigure $ofd -translation crlf
- fconfigure $ofd -buffering line
- fconfigure $ofd -timeout 400
- fconfigure $ofd -mode $mav_baud,n,8,1
- fconfigure $ofd -handshake none
+ if {!$serial_over_mav} {
+  
+  if {![info exists mav_osd_baud]} {
+   set ofd [bl_connect]
+   set mav_baud [bl_read_eep_num $ofd $name2addr(MAV_BAUD)]
+   if {$mav_baud eq ""} {
+    my_error "no response from bootloader"
+   }
+   bl_exit $ofd
+   if {$mav_baud == 115} {set mav_baud 115200} else {set mav_baud 57600}
+   verbose_msg "font update: baud rate is $mav_baud"
+  }
+  # osd_open_mav will wait for osd to initialize
+  set ofd [osd_open_mav]
+  osd::reboot $ofd fl
+
+  set fl_read fl_read_serial
+  set fl_write fl_write_serial
+ } else {
+  set ofd [osd_open_mav]
+  osd::reboot $ofd fl
+  osd::serial_fwd_config [list chan $::mav_chan baud 0 timeout_max 500 timeout_min 20]
+  set fl_read fl_read_mav
+  set fl_write fl_write_mav
+ }
  set resp ""
  set timeou 25
  while {1} {
-  puts $ofd ""
-  puts $ofd ""
-  puts $ofd ""
-  set r [get_font_loader_resp $ofd resp "Ready for Font\n" 1]
+  set r [get_font_loader_resp $ofd resp "Ready for Font\r\n" 1]
   if {$r eq "ok"} break
   if {$r eq "nextch"} continue
   incr timeou -1
   if {!$timeou} {
-    my_error "timeout waiting for responce from font loader"
+   if {$serial_over_mav} {osd::serial_fwd_exit $ofd}
+   mav::close_serial $ofd
+   my_error "timeout waiting for responce from font loader"
   }
  }
- puts -nonewline "Font loader is ready, writing chars: "
+ if {!$verbose} {
+  puts -nonewline "Font loader is ready, writing chars: "
+ } else {
+  puts "Font loader is ready, writing chars: "
+ }
  flush stdout
  for {set char 0} {$char < 256} {incr char} {
-  if {$font_format eq "mcm"} {
-   for {set byte 0} {$byte < 64} {incr byte} {
-    puts $ofd [gets $ifd]
-   }
-  } else {
-   set ch [lindex $fnt $char]
-   for {set byte 0} {$byte < 64} {incr byte} {
-    puts $ofd [lindex $ch $byte]
-   }
+  set ch [lindex $fnt $char]
+  set d ""
+  set n 0
+  for {set byte 0} {$byte < 64} {incr byte} {
+    append d [lindex $ch $byte]
+    append d "\r\n"
+    incr n
+    if {$n == 6} {
+     $fl_write $ofd $d
+     if {$serial_over_mav} {after 140}
+     set n 0
+     set d ""
+    }
+  }
+  if {$n > 0} {
+    $fl_write $ofd $d
+    if {$serial_over_mav} {after 140}
   }
   set resp ""
   set timeo 10
   while {1} {
-   set r [get_font_loader_resp $ofd resp "Char Done\n" 0]
+   set r [get_font_loader_resp $ofd resp "Char Done\r\n" 0]
    if {$r eq "ok"} break
    if {$r eq "nextch"} continue
    incr timeo -1
@@ -1055,32 +1101,27 @@ if {$op eq "writefont"} {
     my_error "timeout waiting for responce after char $char"
    }
   }
-  if {$char % 10 == 0} {puts -nonewline .; flush stdout}
+  if {!$verbose} {
+   if {$char % 10 == 0} {puts -nonewline .; flush stdout}
+  } else {
+   puts "wrote char $char"
+  }
  }
  puts "done."
- close $ofd
- if {$ifd ne "stdin"} {close $ifd}
- if {!$fl_en} {
-  puts -nonewline "Disabling font loader: "
-  flush stdout
-  set ofd [bl_connect]
-  set r [bl_write_eep_num $ofd $name2addr(FONT_LOADER_ON) 0]
-  bl_exit $ofd
-  if {$r} {puts done.} else {puts failed.}
+ if {$serial_over_mav} {
+  osd::serial_fwd_exit $ofd
  }
+ mav::close_serial $ofd
 }
 
 if {$op eq "writefw"} {
  set firmware [ihex_read_and_check $fwfn]
  if {!$serial_over_mav} {
-  #exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
-  set bl_cmd bl_cmd_serial
+  # exec -ignorestderr avrdude -patmega328p -carduino -P $serial_port -b57600 -D -U "flash:w:$fwfn:i"
   set bl_fd [bl_connect]
-  bl_write_flash $bl_fd $firmware
-  bl_exit $bl_fd
  } else {
   set bl_fd [bl_open_mav 1000 100]
-  bl_write_flash $bl_fd $firmware
-  bl_exit $bl_fd
  }
+ bl_write_flash $bl_fd $firmware
+ bl_exit $bl_fd
 }
