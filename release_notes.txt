@@ -1,3 +1,7 @@
+0.5.2
+- Font loading over mavlink.
+- Fixed font loader to support fake max7456.
+- Separate icons for climb efficiency and second battery volage.
 0.5.1
 - Support mavlink serial port forwarding. You don't have to
   disconnect OSD from autopilot if autopilot supports serial port forwarding.
