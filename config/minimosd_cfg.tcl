@@ -1039,8 +1039,15 @@ if {$op eq "writefont"} {
    if {$mav_baud == 115} {set mav_baud 115200} else {set mav_baud 57600}
    verbose_msg "font update: baud rate is $mav_baud"
   }
-  # osd_open_mav will wait for osd to initialize
+  if {!$bl_mav_needs_detect} {
+    # open resets the OSD, wait for it to pass bootloader before osd::reset
+  	set delay 4000
+  } else {
+    # osd_open_mav will wait for osd to initialize
+    set delay 0
+  }
   set ofd [osd_open_mav]
+  after $delay
   osd::reboot $ofd fl
 
   set fl_read fl_read_serial
