@@ -1,3 +1,7 @@
+0.5.3
+- Fixed serial port problems for minimosd_cfg/windows (downgraded freewrap to 663)
+- Updated documentation.
+- Font loader: added delay to pass bootloader if there's no auto detection.
 0.5.2
 - Font loading over mavlink.
 - Fixed font loader to support fake max7456.
