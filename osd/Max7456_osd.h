@@ -48,7 +48,8 @@
 #define MAX7456_END_string 0xff
 
 //VM0 commands mixed with mode NTSC or PAL mode
-#define MAX7456_ENABLE_display_vert 0x0c //mask with NTSC/PAL
+//#define MAX7456_ENABLE_display_vert 0x0c //mask with NTSC/PAL
+#define MAX7456_ENABLE_display_vert 0x08 //mask with NTSC/PAL
 #define MAX7456_RESET 0x02 //mask with NTSC/PAL
 
 //VM0 command modifiers

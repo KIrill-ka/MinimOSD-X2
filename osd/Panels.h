@@ -282,7 +282,7 @@ void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
  uint8_t f = osd_statf1;
  osd.setPanel(x, y);
 
- if(osd_statf & TRIG1S_F) {
+ if(osd_statf1 & TRIG1S_F1) {
   if(!(f & CLIMB_EFF_DET_F1) || alt - climb_eff_alt_start < 1) {
    /* climb detection: check that altitude grows for one second */
    f |= CLIMB_EFF_DET_F1;
@@ -502,8 +502,6 @@ void panCur_A(int first_col, int first_line){
 
 void panAlt(int first_col, int first_line){
     osd.setPanel(first_col, first_line);
-//    osd.printf("%c%5.0f%c",0x11, (double)(osd_alt * converth), high);
-//    if (iconMSL == 1) 
     if(EEPROM.read(SIGN_MSL_ON_ADDR) != 0) osd.printf_P(PSTR("\x11"));
     osd.printf_P(PSTR("%5.0f%c"), (double)(osd_alt * converth), high);
 }
@@ -579,7 +577,7 @@ void check_warn()
 
  if((osd_statf & WARN_MOTOR_F) != 0 && !motor_warn) osd_statf &= ~WARN_MOTOR_F;
 
- if (!(osd_statf & TRIG1S_F)) return;
+ if (!(osd_statf1 & TRIG1S_F1)) return;
 
  if (osd_fix_type < 2) wmask |= 1;
  if (osd_airspeed * converts < stall && takeofftime == 1) wmask |= 2;
@@ -829,7 +827,7 @@ void panGPSats(int first_col, int first_line){
     if (osd_fix_type == 2) gps_str = 0x1f;
     else if (osd_fix_type == 3) gps_str = 0x0f;
     
-    if (eph >= 200 && (osd_statf & TICK_F) != 0)
+    if (eph >= 200 && (osd_statf1 & TICK_F1) != 0)
        gps_str = 0x20;
     
     osd.printf_P(PSTR("%c%2i"), gps_str, osd_satellites_visible);
@@ -1170,12 +1168,12 @@ void timers()
 {
   uint8_t t = 0;
   unsigned long m = millis();
-  if(m/1000 & 1) t |= TICK_F;
-  if((t ^ osd_statf) & TICK_F) {
-   osd_statf ^= TICK_F;
-   osd_statf |= TRIG1S_F;
+  if(m/1000 & 1) t |= TICK_F1;
+  if((t ^ osd_statf1) & TICK_F1) {
+   osd_statf1 ^= TICK_F1;
+   osd_statf1 |= TRIG1S_F1;
   } else {
-   osd_statf &= ~TRIG1S_F;
+   osd_statf1 &= ~TRIG1S_F1;
   }
 
   t = 0;

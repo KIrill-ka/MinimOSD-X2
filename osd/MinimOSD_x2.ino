@@ -116,21 +116,35 @@ void setup()
 
 void loop() 
 {
+    uint32_t ms = millis();
+    uint8_t f;
 
-    if((osd_statf & (NEW_DATA_F|SCREEN_UP_F)) == NEW_DATA_F || millis() > mavLinkTimer + 120) {
-      mavLinkTimer = millis();
+    f = osd_statf;
+
+    if((f & (NEW_DATA_F|SCREEN_UP_F|NO_VSYNC_F)) == NEW_DATA_F || ms > mavLinkTimer + 120) {
+      mavLinkTimer = ms;
       setHeadingPatern();  // generate the heading patern
       setHomeVars();   // calculate and set Distance from home and Direction to home
       setFdataVars();
       writePanels();
-      osd_statf |= SCREEN_UP_F;
-      osd_statf &= ~NEW_DATA_F;
+
+      f = osd_statf;
+      if((f & SCREEN_UP_F) != 0) f |= NO_VSYNC_F; /* no vsync in 120ms, force update */
+      f |= SCREEN_UP_F;
+      f &= ~NEW_DATA_F;
+      osd_statf = f;
     }
 
-    if(osd_statf & SCREEN_UP_F) {
-      if(osd.checkVsync()) {
+    if((f & NO_VSYNC_F) != 0 && osd.checkVsync()) {
+     f &= ~NO_VSYNC_F;
+     osd_statf = f;
+    }
+
+    if(f & SCREEN_UP_F) {
+      if(osd.checkVsync() || (f & NO_VSYNC_F) != 0) {
         osd.update();
-        osd_statf &= ~SCREEN_UP_F;
+        f &= ~SCREEN_UP_F;
+        osd_statf = f;
       }
     }
 

@@ -126,9 +126,9 @@ static char         char_call[OSD_CALL_SIGN_TOTAL] = {0};
 //static boolean      iconMSL = 0;
 //static boolean      landing = 0;
 static unsigned long  last_mav_data_ts = 0;
-//static uint8_t      apm_mav_type;
-#define TICK_F       1
-#define TRIG1S_F     2
+
+#define NO_VSYNC_F   2 // Some cameras and possibly fake MAX7456 don't generate vsync
+                       // despite osd is overlayed. This forces screen updates.
 #define WARN_PANEL_F 4
 #define WARN_MOTOR_F 8
 #define FDATA_OFF_F 16
@@ -142,6 +142,8 @@ static uint8_t      osd_statf = 0;
 #define EFF_RESET_GLIDE_F1   4
 #define CLIMB_EFF_DET_F1     8
 #define CLIMB_EFF_VALID_F1   16
+#define TICK_F1              32
+#define TRIG1S_F1            64
 static uint8_t      osd_statf1 = 0;
 
 
