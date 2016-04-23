@@ -1,5 +1,5 @@
 #pragma once
-#define TXT_VERSION "Миним Экстра2 вер.0.5.2|Самолёт|"
+#define TXT_VERSION "Миним Экстра2 вер.0.5.3|Самолёт|"
 #define TXT_VERSION_FONT "Версия шрифта: "
 #define TXT_WARN_NOGPS     "НЕТ ПОЗИЦИИ!"
 #define TXT_WARN_STALL     " СКОР.МАЛА!"

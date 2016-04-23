@@ -185,6 +185,7 @@
 /* new format panel items, they are read directly from eeprom */
 #define EEP_EF_CLIMB    233
 #define EEP_BATT_B_VOLT 235
+#define EEP_GPS_REL_ALT 237
 
 #define SIGN_MSL_ON_ADDR 876
 #define SIGN_HA_ON_ADDR 878

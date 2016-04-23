@@ -46,6 +46,7 @@ CamPos_en 230 CamPos_x 231 CamPos_y 232
 
 EF_CLIMB_panel_item 233
 BATT_B_VOLT_panel_item 235
+GPS_REL_ALT_panel_item 237
 
 SIGN_MSL_ON 876
 SIGN_HA_ON 878
@@ -464,6 +465,7 @@ proc panel_var {panel var} {
    set ret [list en $en]
    lappend ret x [expr {($val>>8)&0x1f}]
    lappend ret y [expr {$val&0x0f}]
+#FIXME: flags support
 
    return $ret
 }

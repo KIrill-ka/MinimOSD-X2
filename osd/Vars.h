@@ -89,7 +89,7 @@ static uint16_t      osd_cog;                        // Course over ground
 static uint8_t      osd_got_home = 0;               // tels if got home position or not
 static float        osd_home_lat = 0;               // home latidude
 static float        osd_home_lon = 0;               // home longitude
-//static float        osd_home_alt = 0; 
+static float        osd_home_alt = 0; 
 static float        osd_alt_to_home = 0; 
 static long         osd_home_distance = 0;          // distance from home
 static uint8_t      osd_home_direction;             // Arrow direction pointing to home (1-16 to CW loop)
@@ -115,35 +115,30 @@ static char     distchar = 0;
 static char     climbchar = 0;
 static int8_t   fdata_prev_panel;
 
-
-//Call sign variables
+// Call sign
 static char         char_call[OSD_CALL_SIGN_TOTAL] = {0};
 
-//MAVLink session control
-//static boolean      iconAS = 0;
-//static boolean      iconGS = 0;
-//static boolean      iconHA = 0;
-//static boolean      iconMSL = 0;
-//static boolean      landing = 0;
 static unsigned long  last_mav_data_ts = 0;
 
-#define NO_VSYNC_F   2 // Some cameras and possibly fake MAX7456 don't generate vsync
-                       // despite osd is overlayed. This forces screen updates.
-#define WARN_PANEL_F 4
-#define WARN_MOTOR_F 8
-#define FDATA_OFF_F 16
-#define NEW_DATA_F  32
-#define SCREEN_UP_F 64
-#define NEW_CFG_F  128
+#define ARMED_F      1 // AP is armed ARMED
+#define NO_VSYNC_F   2 // With some cameras and possibly fake MAX7456 VSync is 
+                       // not indicated despite osd is overlayed.
+                       // This flag allows screen updates without VSync from MAX7456.
+#define WARN_PANEL_F 4 // panel switched automatically due to warning
+#define WARN_MOTOR_F 8 // show motor warning next time
+#define FDATA_OFF_F 16 // flight statistics display switched off
+#define NEW_DATA_F  32 // osd vars updated with new mavlink info
+#define SCREEN_UP_F 64 // ready to write MAX7456 screen
+#define NEW_CFG_F  128 // config is not compatible with minim osd extra
 static uint8_t      osd_statf = 0;
 
-#define TRIG100MS_F1         1
-#define TICK100_F1           2
-#define EFF_RESET_GLIDE_F1   4
-#define CLIMB_EFF_DET_F1     8
-#define CLIMB_EFF_VALID_F1   16
-#define TICK_F1              32
-#define TRIG1S_F1            64
+#define TRIG100MS_F1         1 // set once per 100ms
+#define TICK100_F1           2 // toggles every 100ms
+#define EFF_RESET_GLIDE_F1   4 // marks transition from powered flight
+#define CLIMB_EFF_DET_F1     8 // climb detection is active (climb efficiency vars are reset)
+#define CLIMB_EFF_VALID_F1   16 // climb efficiency display enabled
+#define TICK_F1              32 // toggles every second
+#define TRIG1S_F1            64 // set once per second
 static uint8_t      osd_statf1 = 0;
 
 

@@ -78,6 +78,9 @@ void read_mavlink()
                     if(type == MAV_AUTOPILOT_INVALID) break;
                     if(mavlink_system.sysid == 97) mavlink_system.sysid = msg.sysid;
                     osd_mode = (uint8_t)mavlink_msg_heartbeat_get_custom_mode(&msg);
+                    if(mavlink_msg_heartbeat_get_base_mode(&msg)& MAV_MODE_FLAG_SAFETY_ARMED)
+                     osd_statf |= ARMED_F;
+                    else osd_statf &= ~ARMED_F;
                 }
                 break;
             case MAVLINK_MSG_ID_BATTERY2:

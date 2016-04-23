@@ -1,5 +1,5 @@
 #pragma once
-#define TXT_VERSION "MinimOSD X2 0.5.2b|Plane|"
+#define TXT_VERSION "MinimOSD X2 0.5.3|Plane|"
 #define TXT_VERSION_FONT "Font version: "
 #define TXT_WARN_NOGPS     " No GPS fix!"
 #define TXT_WARN_STALL     "   Stall!"

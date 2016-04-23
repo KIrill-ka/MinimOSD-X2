@@ -3,6 +3,7 @@
 void check_warn();
 void check_rssi();
 void check_panel_switch(int8_t allow_autoswitch);
+void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags);
 
 //extern int8_t debug_r;
 
@@ -129,6 +130,7 @@ void writePanels()
       if(ISd(0,CALLSIGN_BIT)) panCALLSIGN(panCALLSIGN_XY[0][panel], panCALLSIGN_XY[1][panel]);
       if(get_item_config(EEP_BATT_B_VOLT, panel, &x, &y, &f)) showBatteryBVolt(x, y, f);
       if(get_item_config(EEP_EF_CLIMB, panel, &x, &y, &f)) showClimbEfficiency(x, y, f);
+      if(get_item_config(EEP_GPS_REL_ALT, panel, &x, &y, &f)) showGPSRelAlt(x, y, f);
 
     } else {
      /* show warnings even if screen is disabled */
@@ -770,6 +772,13 @@ void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags)
     osd.printf_P(PSTR("%5.2f%c"), (float)osd_battb_volt/1000.0f, '\xb5');
 }
 
+void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags)
+{
+    osd.setPanel(x, y);
+    if(flags & 1) osd.printf_P(PSTR("\x1f")); /* FIXME: change icon */
+    osd.printf_P(PSTR("%5.0f%c"), (osd_alt-osd_home_alt) * converth, high);
+}
+
 /* **************************************************************** */
 // Panel  : panBattery A (Voltage 1)
 // Needs  : X, Y locations
@@ -981,6 +990,7 @@ void panFlightMode(int first_col, int first_line){
     if (osd_mode == 12) mode_str = PSTR(TXT_MODE_LOITER);
     if (osd_mode == 15) mode_str = PSTR(TXT_MODE_GUIDED);
     if (osd_mode == 16) mode_str = PSTR(TXT_MODE_INITIALIZING);
+    if (!(osd_statf & ARMED_F)) osd.write('\x2a');
     osd.printf_P(mode_str);
 }
 
