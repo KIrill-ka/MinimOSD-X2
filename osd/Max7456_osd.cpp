@@ -38,7 +38,7 @@ OSD::OSD()
 
 //------------------ init ---------------------------------------------------
 
-void OSD::init(bool new_cfg)
+void OSD::init()
 {
   uint8_t offset;
 
@@ -67,12 +67,11 @@ void OSD::init(bool new_cfg)
   // making sure the Max7456 is enabled
   control(1);
 
-  if(new_cfg) {
-   offset = EEPROM.read(VOFFSET_ADDR);
-   write_reg(MAX7456_VOS_reg, offset); // 5 valid bits
-   offset = EEPROM.read(HOFFSET_ADDR);
-   write_reg(MAX7456_HOS_reg, offset); // 6 valid bits
-  }
+  offset = EEPROM.read(VOFFSET_ADDR);
+  write_reg(MAX7456_VOS_reg, offset); // 5 valid bits
+  offset = EEPROM.read(HOFFSET_ADDR);
+  write_reg(MAX7456_HOS_reg, offset); // 6 valid bits
+  
   memset(osdbuf, ' ', sizeof(osdbuf)-1);
   osdbuf[sizeof(osdbuf)-1] = MAX7456_END_string;
 }

@@ -110,7 +110,6 @@ void read_mavlink()
                     osd_groundspeed = mavlink_msg_vfr_hud_get_groundspeed(&msg);
                     osd_heading = mavlink_msg_vfr_hud_get_heading(&msg); // 0..360 deg, 0=north
                     osd_throttle = (uint8_t)mavlink_msg_vfr_hud_get_throttle(&msg);
-                    osd_alt = mavlink_msg_vfr_hud_get_alt(&msg);
                     osd_climb = mavlink_msg_vfr_hud_get_climb(&msg);
                 }
                 break;
@@ -167,6 +166,7 @@ void read_mavlink()
             case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
                 {
                     osd_alt_to_home = mavlink_msg_global_position_int_get_relative_alt(&msg)*0.001;
+                    osd_alt = mavlink_msg_global_position_int_get_alt(&msg);
                 }
                 break;
             case MAVLINK_MSG_ID_COMMAND_LONG:

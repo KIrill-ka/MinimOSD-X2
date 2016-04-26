@@ -15,7 +15,7 @@ void startPanels(){
 void panLogo()
 {
     osd.setPanel(5, 5);
-    osd.printf_P(PSTR(TXT_VERSION));
+    osd.printf_P(PSTR(TXT_VERSION), FW_VER_HI, FW_VER_MID, FW_VER_LO);
     osd.printf_P(PSTR(TXT_VERSION_FONT));
     osd.write(0xb8);
     osd.update();
@@ -412,9 +412,8 @@ void panWindSpeed(int first_col, int first_line){
 void check_panel_switch(int8_t allow_autoswitch) {
   bool rotatePanel = 0;
   uint16_t ch_raw = 0;
-  uint8_t np;
+  uint8_t np = npanels_conf;
 
-  np = (osd_statf & NEW_CFG_F) != 0 ? npanels : 2;
   if(warning != 0 && panel_auto_switch <= np && allow_autoswitch
                   && (panel == npanels || !ISd(panel, Warn_BIT))) {
       panel = panel_auto_switch; 
@@ -769,14 +768,16 @@ void panRoll(int first_col, int first_line){
 void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags)
 {
     osd.setPanel(x, y);
-    osd.printf_P(PSTR("%5.2f%c"), (float)osd_battb_volt/1000.0f, '\xb5');
+    osd.printf_P(PSTR("%5.2f"), (float)osd_battb_volt/1000.0f);
+    if(flags & 0x10) osd.write('\xb5');
 }
 
 void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags)
 {
     osd.setPanel(x, y);
-    if(flags & 1) osd.printf_P(PSTR("\x1f")); /* FIXME: change icon */
-    osd.printf_P(PSTR("%5.0f%c"), (osd_alt-osd_home_alt) * converth, high);
+    if(flags & 0x20) osd.write('\x1f'); /* FIXME: change icon */
+    osd.printf_P(PSTR("%5.0f"), (osd_alt-osd_home_alt) * converth);
+    if(flags & 0x10) osd.write(high);
 }
 
 /* **************************************************************** */

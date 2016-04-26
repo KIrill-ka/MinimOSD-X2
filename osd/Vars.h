@@ -129,7 +129,6 @@ static unsigned long  last_mav_data_ts = 0;
 #define FDATA_OFF_F 16 // flight statistics display switched off
 #define NEW_DATA_F  32 // osd vars updated with new mavlink info
 #define SCREEN_UP_F 64 // ready to write MAX7456 screen
-#define NEW_CFG_F  128 // config is not compatible with minim osd extra
 static uint8_t      osd_statf = 0;
 
 #define TRIG100MS_F1         1 // set once per 100ms
@@ -206,6 +205,7 @@ static uint8_t      osd_rssi = 0; //raw value from mavlink
 static int16_t      rssi = -99; // scaled value 0-100%
 static uint8_t      rssiraw_on = 0; 
 static uint8_t      rssi_warn_level = 0;
+static uint8_t      npanels_conf = 0;
 
 static uint8_t      warning = 0;
 

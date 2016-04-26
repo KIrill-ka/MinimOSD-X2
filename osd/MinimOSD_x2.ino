@@ -86,19 +86,44 @@ along with this program. If not, see <http://www.gnu.org/licenses/>
 FastSerialPort0(Serial);
 OSD osd;
 
+static void convert_cfg(uint8_t prev_ver)
+{
+    uint8_t i, j;
+    if(prev_ver < EEP_VER_START || prev_ver > EEP_VER_CURRENT) {
+     eeprom_write_byte((uint8_t*)FONT_LOADER_ON_ADDR, 1);
+     eeprom_write_byte((uint8_t*)VOFFSET_ADDR, 16);
+     eeprom_write_byte((uint8_t*)HOFFSET_ADDR, 32);
+     eeprom_write_byte((uint8_t*)MAV_BAUD_ADDR, 57);
+     eeprom_write_byte((uint8_t*)MOTOR_WARN_THR_ADDR, 255);
+     eeprom_write_byte((uint8_t*)PANELS_NUM_ADDR, 2);
+     if(eeprom_read_byte((uint8_t*)AUTO_SCREEN_SWITC_ADD) == 3)
+      eeprom_write_byte((uint8_t*)AUTO_SCREEN_SWITC_ADD, 4);
+     for(i = 0; i < npanels; i++) {
+      for(j = EEP_EF_CLIMB; j < PANEL_CONFIG_SIZE; j++)
+       eeprom_write_byte((uint8_t*) (j+i*PANEL_CONFIG_SIZE), 0);
+      eeprom_write_byte((uint8_t*) (panCamPos_en_ADDR+i*PANEL_CONFIG_SIZE), 0);
+     }
+    } else if(prev_ver < 6) {
+     for(i = 0; i < npanels; i++)
+      eeprom_write_word((uint16_t*) (EEP_GPS_REL_ALT+i*PANEL_CONFIG_SIZE), 0);
+     eeprom_write_byte((uint8_t*)PANELS_NUM_ADDR, 3);
+    }
+    eeprom_write_byte((uint8_t*)VER_NEW_ADDR, EEP_VER_CURRENT);
+}
+
 void setup() 
 {
-	if(eeprom_read_byte((uint8_t*)VER_NEW_ADDR) == VER_NEW)
-     osd_statf |= NEW_CFG_F;
-    if((osd_statf & NEW_CFG_F) != 0
-       && eeprom_read_byte((uint8_t*)MAV_BAUD_ADDR) == 115)
+    uint8_t ver;
+    ver = eeprom_read_byte((uint8_t*)VER_NEW_ADDR);
+	if(ver != EEP_VER_CURRENT) convert_cfg(ver);
+    if(eeprom_read_byte((uint8_t*)MAV_BAUD_ADDR) == 115)
      Serial.begin(115200);
     else Serial.begin(57600);
     // setup mavlink port
     mavlink_comm_0_port = &Serial;
 
     // Prepare OSD for displaying 
-    osd.init((osd_statf & NEW_CFG_F) != 0);
+    osd.init();
 
     // Start 
     startPanels();
@@ -108,7 +133,14 @@ void setup()
     readSettings();
     for(panel = 0; panel < npanels; panel++) readPanelSettings();
     panel = 0; //set panel to 0 to start in the first navigation screen
-    checkModellType();
+    if (eeprom_read_byte((uint8_t*)MODELL_TYPE_ADD) != 0)
+     eeprom_write_byte((uint8_t*)MODELL_TYPE_ADD, 0);
+    if (eeprom_read_byte((uint8_t*)FW_VERSION1_ADDR) != FW_VER_HI)
+     eeprom_write_byte((uint8_t*)FW_VERSION1_ADDR, FW_VER_HI);
+    if (eeprom_read_byte((uint8_t*)FW_VERSION2_ADDR) != FW_VER_MID)
+     eeprom_write_byte((uint8_t*)FW_VERSION2_ADDR, FW_VER_MID);
+    if (eeprom_read_byte((uint8_t*)FW_VERSION3_ADDR) != FW_VER_LO)
+     eeprom_write_byte((uint8_t*)FW_VERSION3_ADDR, FW_VER_LO);
     load_mavlink_settings();
 	delay(2000);
 	Serial.flush(); 

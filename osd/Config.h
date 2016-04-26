@@ -1,4 +1,8 @@
 
+#define FW_VER_HI 0
+#define FW_VER_MID 6
+#define FW_VER_LO 0
+
 #define on 1
 #define off 0
 
@@ -7,7 +11,8 @@
 #define VER_OLD 76 
 
 // new eeprom format version
-#define VER_NEW 5
+#define EEP_VER_START 4
+#define EEP_VER_CURRENT 6
 
 // EEPROM Stepping, be careful not to overstep. 
 // We reserved floats for just to be sure if some values needs to be
@@ -228,6 +233,7 @@
 #define HOFFSET_ADDR 947
 #define MAV_BAUD_ADDR 948
 #define FONT_LOADER_ON_ADDR 949
+#define PANELS_NUM_ADDR 950
 
 #define VER_OLD_ADDR 1010
 #define VER_NEW_ADDR 1014

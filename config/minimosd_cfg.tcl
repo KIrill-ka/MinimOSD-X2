@@ -7,9 +7,9 @@ if {[info exists env(HOME)]} {
 }
 
 
-set eeprom_version 5
+set eeprom_version 6
 set npanels 3
-set fw_version "0.5.2"
+set fw_version "0.5.3"
 
 array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
@@ -81,6 +81,7 @@ VOFFSET 946
 HOFFSET 947
 MAV_BAUD 948
 FONT_LOADER_ON 949
+PANELS_NUM 950
 EEPROM_OLD_VER 1010
 EEPROM_NEW_VER 1014
 }
@@ -110,6 +111,7 @@ MOTOR_WARN_CURR 50
 VOFFSET 0
 HOFFSET 0
 MAV_BAUD 57
+PANELS_NUM 3
 }
 
 set write_ignore_vars {
@@ -120,7 +122,8 @@ set cfg_new_vars {
  VOFFSET HOFFSET MAV_BAUD
  MOTOR_WARN_CURR MOTOR_WARN_THR
  CamPos
- BATT_B_VOLT EF_CLIMB
+ BATT_B_VOLT EF_CLIMB GPS_REL_ALT
+ PANELS_NUM 
 }
 
 proc cfg_var_valid {var {panel -1}} {
@@ -431,6 +434,23 @@ proc bl_check_sig {fd} {
  return 0
 }
 
+array set str2f {s 0x20 u 0x10}
+proc str2flags {s} {
+ set f 0
+ for {set i 0} {$i < [string length $s]} {incr i} {
+   set f [expr {$::str2f([string index $s $i]) | $f}]
+ }
+ return $f
+}
+
+proc flags2str {f} {
+ set s ""
+ foreach i [array names ::str2f] {
+  if {$f & $::str2f($i)} {append s $i}
+ }
+ return $s
+}
+
 proc var_type {name} {
   if {$::name2addr($name) < 250} {
    if {[string match "*_en" $name]} {return panel_item_old}
@@ -456,6 +476,7 @@ proc panel_var {panel var} {
       binary scan $::eep @${addr}cu val
       lappend ret $i $val
      }
+     lappend ret flags 0
      return $ret
    }
 
@@ -465,7 +486,7 @@ proc panel_var {panel var} {
    set ret [list en $en]
    lappend ret x [expr {($val>>8)&0x1f}]
    lappend ret y [expr {$val&0x0f}]
-#FIXME: flags support
+   lappend ret flags [expr {(($val>>9)&0x30) | (($val>>4)&0x0f)}]
 
    return $ret
 }
@@ -523,20 +544,25 @@ proc dump_panel_cfg {fd var_name} {
  set var [var_name $var_name]
 
  set en "-"
+ #set flags 0x3f
  for {set panel 0} {$panel < $::npanels} {incr panel} {
   array set v [panel_var $panel $var_name]
   if {$v(en)} {set en "+"}
+  #set flags [expr {$flags & $v(flags)}]
   array unset v
  }
- puts -nonewline $fd [format "%s%-18s" $en $var]
+ puts -nonewline $fd [format "%s%-15s" $en $var]
  for {set panel 0} {$panel < $::npanels} {incr panel} {
   if {![cfg_var_valid $var $panel]} {
-    puts -nonewline $fd " -   0   0"
-    continue
+   array set v {x 0 y 0 en - flags 0}
+  } else {
+   array set v [panel_var $panel $var_name]
   }
-  array set v [panel_var $panel $var_name]
-  if {$v(en)} {set en " +"} else {set en " -"}
-  puts -nonewline $fd [format "%s %3d %3d" $en $v(x) $v(y)]
+  if {$v(en)} {set en "+"} else {set en "-"}
+  #set f $en[flags2str [expr {$v(flags) & ~$flags}]]
+  set f $en[flags2str $v(flags)]
+  if {$panel == 0} {set sp " "} else {set sp "    "}
+  puts -nonewline $fd [format "$sp%-2s %3d %3d" $f $v(x) $v(y)]
   array unset v
  }
  puts $fd ""
@@ -598,6 +624,7 @@ proc set_panel_var {f p var val} {
  if {[info exists ::name2addr(${var}_en)]} {
   # old style format
   foreach {i j} $val {
+   if {$i eq "flags"} continue
    set addr $::name2addr(${var}_${i})
    set addr [expr {$addr + $p*250}]
    $::write_var $f $addr [binary format c $j]
@@ -605,7 +632,7 @@ proc set_panel_var {f p var val} {
   return
  }
  array set v $val
- set vv [expr {($v(en)<<15) | $v(y) | ($v(x)<<8)}]
+ set vv [expr {($v(en)<<15) | $v(y) | ($v(x)<<8) | (($v(flags)&0xf)<<4) | (($v(flags)&0x30)<<9)}]
  set addr $::name2addr(${var}_panel_item)
  set addr [expr {$addr + $p*250}]
  $::write_var $f $addr [binary format S $vv]
@@ -765,7 +792,9 @@ if {$op eq "write"} {
    set off 1
    for {set p 0} {$p < $np} {incr p} {
     set v {}
-    lappend v en $plusminus([lindex $s $off]) 
+    set f [lindex $s $off]
+    lappend v en $plusminus([string index $f 0])
+    lappend v flags [str2flags [string range $f 1 end]]
     incr off
     lappend v x [lindex $s $off] 
     incr off
@@ -780,7 +809,7 @@ if {$op eq "write"} {
    }
    if {!$noclear} {
     for {} {$p < $npanels} {incr p} {
-     set_panel_var $f $p $var {en 0 x 0 y 0}
+     set_panel_var $f $p $var {en 0 x 0 y 0 flags 0}
     }
    }
    continue
@@ -797,7 +826,7 @@ if {$op eq "write"} {
      # disable all panel displays by default
      set var [var_name $i]
      for {set p 0} {$p < $npanels} {incr p} {
-      set_panel_var $f $p $var {en 0 x 0 y 0}
+      set_panel_var $f $p $var {en 0 x 0 y 0 flags 0}
      }
     } elseif {[info exists var_default($i)]} {
      set_var $f $i $var_default($i)
