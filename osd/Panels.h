@@ -775,7 +775,7 @@ void showBatteryBVolt(uint8_t x, uint8_t y, uint8_t flags)
 void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags)
 {
     osd.setPanel(x, y);
-    if(flags & 0x20) osd.write('\x1f'); /* FIXME: change icon */
+    if(flags & 0x20) osd.write('\x82');
     osd.printf_P(PSTR("%5.0f"), (osd_alt-osd_home_alt) * converth);
     if(flags & 0x10) osd.write(high);
 }
