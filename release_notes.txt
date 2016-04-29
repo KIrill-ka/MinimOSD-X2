@@ -1,3 +1,13 @@
+0.6
+- GPS relative altitude display.
+- MAVlink message display (aka statustext).
+- Support individual options (flags) for new display items.
+- Added number of panels parameter for sequential switch mode.
+- Automatic eeprom conversion in OSD.
+- DISARMED status display (* before MODE).
+- Support for "strange" camera/max7456 behaviour where osd is shown, but VSync is not
+  indicated by max7456.
+- New altitude icons.
 0.5.3
 - Fixed serial port problems for minimosd_cfg/windows (downgraded freewrap to 663)
 - Updated documentation.
