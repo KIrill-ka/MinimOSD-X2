@@ -471,6 +471,7 @@ proc dec_flag_set {flag_v ch f} {
 
 array set flags_info {
   GPS_REL_ALT {s {bit_flag 0x20} u {bit_flag 0x10} l {bit_flag 0x8}}
+  BATT_B_VOLT {u {bit_flag 0x10}}
   MAV_MSG {w {dec_flag 31}}
 }
 proc str2flags {var s} {
