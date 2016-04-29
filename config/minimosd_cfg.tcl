@@ -47,6 +47,7 @@ CamPos_en 230 CamPos_x 231 CamPos_y 232
 EF_CLIMB_panel_item 233
 BATT_B_VOLT_panel_item 235
 GPS_REL_ALT_panel_item 237
+MAV_MSG_panel_item 239
 
 SIGN_MSL_ON 876
 SIGN_HA_ON 878
@@ -122,7 +123,7 @@ set cfg_new_vars {
  VOFFSET HOFFSET MAV_BAUD
  MOTOR_WARN_CURR MOTOR_WARN_THR
  CamPos
- BATT_B_VOLT EF_CLIMB GPS_REL_ALT
+ BATT_B_VOLT EF_CLIMB GPS_REL_ALT MAV_MSG
  PANELS_NUM 
 }
 
@@ -434,19 +435,69 @@ proc bl_check_sig {fd} {
  return 0
 }
 
-array set str2f {s 0x20 u 0x10}
-proc str2flags {s} {
+proc bit_flag_get {flag_v str pos} {
+ return $flag_v
+}
+
+proc bit_flag_set {flag_v ch f} {
+ if {$flag_v & $f} {return $ch}
+ return ""
+}
+
+proc dec_flag_get {flag_v str pos} {
+ upvar $pos i
+ if {[string is digit [string index $str $i+2]]} {
+  set end 2
+ } else {
+  set end 1
+ }
+ set val [string range $str $i+1 $i+$end]
+ if {![string is integer $val]} {
+  my_error "expected integer value in \"$str\""
+ }
+ if {$val & ~$flag_v} {
+  puts [format %x [expr  ~$flag_v]]
+  my_error "value is to large in \"$str\""
+ }
+
+ incr i $end
+ return $val
+}
+
+proc dec_flag_set {flag_v ch f} {
+ if {$flag_v & $f} {return $ch[expr {$f & $flag_v}]}
+ return ""
+}
+
+array set flags_info {
+  GPS_REL_ALT {s {bit_flag 0x20} u {bit_flag 0x10} l {bit_flag 0x8}}
+  MAV_MSG {w {dec_flag 31}}
+}
+proc str2flags {var s} {
  set f 0
+ array set fi $::flags_info($var)
  for {set i 0} {$i < [string length $s]} {incr i} {
-   set f [expr {$::str2f([string index $s $i]) | $f}]
+   set ch [string index $s $i]
+   lset fi($ch) 0 [lindex $fi($ch) 0]_get
+   set ff [eval [concat $fi($ch) $s i]]
+   set f [expr {$ff | $f}]
  }
  return $f
 }
+#   set f [expr {$::str2f($ch) | $f}]
+#   if {$ch eq "x"} {
+#    set ff 0x[string range $s $i+1 $i+2]
+#    if {[catch {expr {$ff}}] != 0} {puts err}
+#    set f [expr {$ff | $f}]
+#    incr i 2
+#   }
 
-proc flags2str {f} {
+proc flags2str {var f} {
+ array set fi $::flags_info($var)
  set s ""
- foreach i [array names ::str2f] {
-  if {$f & $::str2f($i)} {append s $i}
+ foreach i [array names fi] {
+  lset fi($i) 0 [lindex $fi($i) 0]_set
+  append s [eval [concat $fi($i) $i $f]]
  }
  return $s
 }
@@ -560,9 +611,12 @@ proc dump_panel_cfg {fd var_name} {
   }
   if {$v(en)} {set en "+"} else {set en "-"}
   #set f $en[flags2str [expr {$v(flags) & ~$flags}]]
-  set f $en[flags2str $v(flags)]
-  if {$panel == 0} {set sp " "} else {set sp "    "}
-  puts -nonewline $fd [format "$sp%-2s %3d %3d" $f $v(x) $v(y)]
+  set f $en
+  if {$v(flags) != 0} {
+   append f [flags2str $var $v(flags)]
+  } 
+  if {$panel == 0} {set sp " "} else {set sp "     "}
+  puts -nonewline $fd [format "$sp%-3s %3d %3d" $f $v(x) $v(y)]
   array unset v
  }
  puts $fd ""
@@ -794,7 +848,11 @@ if {$op eq "write"} {
     set v {}
     set f [lindex $s $off]
     lappend v en $plusminus([string index $f 0])
-    lappend v flags [str2flags [string range $f 1 end]]
+    if {[string range $f 1 end] ne ""} {
+     lappend v flags [str2flags $var [string range $f 1 end]]
+    } else {
+     lappend v flags 0
+    }
     incr off
     lappend v x [lindex $s $off] 
     incr off

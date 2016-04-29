@@ -125,6 +125,22 @@ void read_mavlink()
                  cam_pan_angle = yaw/100;
                 }
                 break;
+            case MAVLINK_MSG_ID_STATUSTEXT:
+                {
+                 uint8_t i;
+                 uint8_t sev = mavlink_msg_statustext_get_severity(&msg);
+                 if(statustext_timer != 0 && sev >= statustext_sev) break;
+                 statustext_sev = sev;
+                 statustext_timer = 107; /* 10.7 sec */
+                 statustext_pos = 0;
+                 mavlink_msg_statustext_get_text(&msg, statustext);
+                 for(i = 0; i < sizeof(statustext); i++) {
+                  char c = statustext[i];
+                  if(c >= 'a' && c <= 'z') statustext[i] = c-('a'-'A');
+                 }
+                }
+                break;
+                
             case MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT:
                 {
                   wp_target_bearing = mavlink_msg_nav_controller_output_get_target_bearing(&msg);
@@ -166,7 +182,7 @@ void read_mavlink()
             case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
                 {
                     osd_alt_to_home = mavlink_msg_global_position_int_get_relative_alt(&msg)*0.001;
-                    osd_alt = mavlink_msg_global_position_int_get_alt(&msg);
+                    osd_alt = mavlink_msg_global_position_int_get_alt(&msg)*0.001;
                 }
                 break;
             case MAVLINK_MSG_ID_COMMAND_LONG:

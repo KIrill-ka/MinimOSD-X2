@@ -104,8 +104,10 @@ static void convert_cfg(uint8_t prev_ver)
       eeprom_write_byte((uint8_t*) (panCamPos_en_ADDR+i*PANEL_CONFIG_SIZE), 0);
      }
     } else if(prev_ver < 6) {
-     for(i = 0; i < npanels; i++)
+     for(i = 0; i < npanels; i++) {
       eeprom_write_word((uint16_t*) (EEP_GPS_REL_ALT+i*PANEL_CONFIG_SIZE), 0);
+      eeprom_write_word((uint16_t*) (EEP_MAV_STATUSTEXT+i*PANEL_CONFIG_SIZE), 0);
+     }
      eeprom_write_byte((uint8_t*)PANELS_NUM_ADDR, 3);
     }
     eeprom_write_byte((uint8_t*)VER_NEW_ADDR, EEP_VER_CURRENT);

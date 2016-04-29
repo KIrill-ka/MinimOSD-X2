@@ -4,6 +4,7 @@ void check_warn();
 void check_rssi();
 void check_panel_switch(int8_t allow_autoswitch);
 void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags);
+void showMAVStatusText(uint8_t x, uint8_t y, uint8_t flags);
 
 //extern int8_t debug_r;
 
@@ -80,6 +81,7 @@ void writePanels()
       uint8_t x, y, f;
       //Testing bits from 8 bit register A 
       //if(ISa(panel,Cen_BIT)) panCenter(panCenter_XY[0][panel], panCenter_XY[1][panel]);   //4x2
+      if(get_item_config(EEP_MAV_STATUSTEXT, panel, &x, &y, &f)) showMAVStatusText(x, y, f);
       if(ISd(panel,Warn_BIT)) panWarn(panWarn_XY[0][panel], panWarn_XY[1][panel]);
       if(ISa(panel,Pit_BIT)) panPitch(panPitch_XY[0][panel], panPitch_XY[1][panel]); //5x1
       if(ISa(panel,Rol_BIT)) panRoll(panRoll_XY[0][panel], panRoll_XY[1][panel]); //5x1
@@ -534,7 +536,7 @@ void panHomeAlt(int first_col, int first_line){
 //    osd.printf("%c%5.0f%c",0x12, (double)(osd_alt_to_home * converth), high);
 //    if (iconHA == 1) 
     if(EEPROM.read(SIGN_HA_ON_ADDR) != 0) osd.printf_P(PSTR("\x12"));
-    osd.printf_P(PSTR("%5.0f%c"), (double)(osd_alt_to_home * converth), high);
+    osd.printf_P(PSTR("%4.0f%c"), (double)(osd_alt_to_home * converth), high);
 }
 
 /* **************************************************************** */
@@ -667,7 +669,7 @@ void panBatteryPercent(int first_col, int first_line){
     
     if (EEPROM.read(OSD_BATT_SHOW_PERCENT_ADDR) == 1){
         osd.printf_P(PSTR("%c%3.0i%c"), 0x17, osd_battery_remaining_A, 0x25);
-    }else{
+    } else {
         osd.printf_P(PSTR("%c%4.0f%c"), 0x17, mah_used, 0x01);
     }
 }
@@ -776,8 +778,35 @@ void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags)
 {
     osd.setPanel(x, y);
     if(flags & 0x20) osd.write('\x82');
-    osd.printf_P(PSTR("%5.0f"), (osd_alt-osd_home_alt) * converth);
+    osd.printf_P((flags & 8) ? PSTR("%-4.0f") : PSTR("%4.0f"), (osd_alt-osd_home_alt) * converth);
     if(flags & 0x10) osd.write(high);
+}
+
+void showMAVStatusText(uint8_t x, uint8_t y, uint8_t flags)
+{
+    osd.setPanel(x, y);
+    uint8_t w;
+    uint8_t t;
+    uint8_t l;
+    uint8_t i, p;
+
+    t = statustext_timer;
+    if(t == 0) return;
+    l = strnlen(statustext, 50);
+    p = statustext_pos;
+
+    w = flags & 0x1f;
+    if(w > 32-x) w = 32-x;
+
+    if(osd_statf1 & TRIG100MS_F1) {
+     if((t & 1) == 0 && ((t&7) == 0 || p != 0) && l > w) {
+       p++;
+       if(p+w > l) p = 0;
+       statustext_pos = p;
+     }
+     statustext_timer = t-1;
+    }
+    for(i = 0; i < w && p+i < l; i++) osd.write(statustext[p+i]);
 }
 
 /* **************************************************************** */

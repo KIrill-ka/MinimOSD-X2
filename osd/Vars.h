@@ -209,3 +209,8 @@ static uint8_t      npanels_conf = 0;
 
 static uint8_t      warning = 0;
 
+// mavlink statustext display
+static char statustext[50];
+static uint8_t statustext_pos;
+static uint8_t statustext_sev;
+static uint8_t statustext_timer;
