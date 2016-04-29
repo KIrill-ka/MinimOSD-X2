@@ -16,6 +16,7 @@ cd config
 sh build.sh
 cd ..
 cp config/minimosd_cfg $rel/
+cp config/minimosd_cfg.bat $rel/
 cp config/*.mcm $rel/
 cp doc/*.pdf $rel/
 cd $rel
