@@ -9,7 +9,7 @@ if {[info exists env(HOME)]} {
 
 set eeprom_version 6
 set npanels 3
-set fw_version "0.5.3"
+set fw_version "0.6.0"
 
 array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
