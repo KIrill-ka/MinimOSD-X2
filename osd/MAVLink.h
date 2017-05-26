@@ -98,6 +98,7 @@ void read_mavlink()
                 {
                     osd_lat = mavlink_msg_gps_raw_int_get_lat(&msg) / 10000000.0f;
                     osd_lon = mavlink_msg_gps_raw_int_get_lon(&msg) / 10000000.0f;
+                    osd_alt = mavlink_msg_gps_raw_int_get_alt(&msg)*0.001;
                     osd_fix_type = mavlink_msg_gps_raw_int_get_fix_type(&msg);
                     osd_satellites_visible = mavlink_msg_gps_raw_int_get_satellites_visible(&msg);
                     osd_cog = mavlink_msg_gps_raw_int_get_cog(&msg);
@@ -170,7 +171,7 @@ void read_mavlink()
                 break;           
             case MAVLINK_MSG_ID_WIND:
                 {
-                  osd_winddirection = mavlink_msg_wind_get_direction(&msg); // 0..360 deg, 0=north
+                  osd_winddirection = mavlink_msg_wind_get_direction(&msg); /* -180 .. 180 degrees */
                   osd_windspeed = mavlink_msg_wind_get_speed(&msg); //m/s
                 }
                 break;
@@ -182,7 +183,6 @@ void read_mavlink()
             case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
                 {
                     osd_alt_to_home = mavlink_msg_global_position_int_get_relative_alt(&msg)*0.001;
-                    osd_alt = mavlink_msg_global_position_int_get_alt(&msg)*0.001;
                 }
                 break;
             case MAVLINK_MSG_ID_COMMAND_LONG:
