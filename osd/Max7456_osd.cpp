@@ -31,7 +31,7 @@ static uint8_t read_reg(uint8_t addr)
  PORTD |= _BV(PD6);
  return v;
 }
-
+  
 OSD::OSD()
 {
 }
@@ -49,18 +49,8 @@ void OSD::init()
 
   detectMode();
 
-  digitalWrite(MAX7456_SELECT,LOW);
-  //read black level register
-  Spi.transfer(MAX7456_OSDBL_reg_read);//black level read register
-  byte osdbl_r = Spi.transfer(0xff);
-  Spi.transfer(MAX7456_VM0_reg);
-  Spi.transfer(MAX7456_RESET | video_mode);
+  write_reg(MAX7456_VM0_reg, MAX7456_RESET | video_mode);
   delay(50);
-  //set black level
-  byte osdbl_w = (osdbl_r & 0xef); //Set bit 4 to zero 11101111
-  Spi.transfer(MAX7456_OSDBL_reg); //black level write register
-  Spi.transfer(osdbl_w);
-
   setBrightness();
 
   // define sync (auto,int,ext) and
@@ -81,9 +71,7 @@ void OSD::init()
 void OSD::detectMode()
 {
   //read STAT and auto detect Mode PAL/NTSC
-  digitalWrite(MAX7456_SELECT,LOW);
-  Spi.transfer(MAX7456_STAT_reg_read);//status register
-  byte osdstat_r = Spi.transfer(0xff);
+  byte osdstat_r = read_reg(MAX7456_STAT_reg_read);
 
   if ((B00000001 & osdstat_r) == 1){ //PAL
       setMode(1);  
@@ -99,7 +87,6 @@ void OSD::detectMode()
       else { //PAL
           setMode(1);
       }
-      digitalWrite(MAX7456_SELECT,LOW);
   }
 }
 
@@ -109,24 +96,35 @@ void OSD::setBrightness()
 
     uint8_t blevel = EEPROM.read(OSD_BRIGHTNESS_ADDR);
     uint8_t x;
+    uint8_t osdbl;
+    uint8_t osd_level;
 
-    if(blevel == 0) //low brightness
-        blevel = MAX7456_WHITE_level_80;
-    else if(blevel == 1) 
-        blevel = MAX7456_WHITE_level_90;
-    else if(blevel == 2)
-        blevel = MAX7456_WHITE_level_100;
-    else if(blevel == 3) //high brightness
-        blevel = MAX7456_WHITE_level_120;
-    else 
-        blevel = MAX7456_WHITE_level_80; //low brightness if bad value
-    
-    // set all rows to same charactor white level, 90%
-    for (x = 0x0; x < 0x10; x++)
-    {
-        Spi.transfer(x + 0x10);
-        Spi.transfer(blevel);
+    //read black level register
+    osdbl = read_reg(MAX7456_OSDBL_reg_read);
+    if(blevel >= 100) osdbl |= 1<<4;
+    else osdbl &= ~(1<<4);
+    write_reg(MAX7456_OSDBL_reg, osdbl);
+
+
+    switch(blevel%10) {
+            case 1:  osd_level = MAX7456_WHITE_level_90; break;
+            case 2:  osd_level = MAX7456_WHITE_level_100; break;
+            case 3:  osd_level = MAX7456_WHITE_level_120; break;
+            case 0:  
+            default:
+                     osd_level = MAX7456_WHITE_level_80; break;
     }
+    switch((blevel/10)%10) {
+            case 1:  osd_level |= 1<<2; /* 10% */ break;
+            case 2:  osd_level |= 2<<2; /* 20% */ break;
+            case 3:  osd_level |= 3<<2; /* 30% */ break;
+            case 0:  
+            default: /* no change, level 0% */ break;
+    }
+    
+    // set all rows to the same brightness level
+    for (x = 0x0; x < 0x10; x++) 
+        write_reg(x+0x10, osd_level);
 }
 
 //------------------ Set Mode (PAL/NTSC) ------------------------------------
