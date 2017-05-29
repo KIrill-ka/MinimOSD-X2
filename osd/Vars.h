@@ -59,16 +59,10 @@ static uint8_t 		motor_warn_curr = 0;            // 0.0A
 static uint8_t 		motor_warn_thr = 255;           // 255%
 static int16_t      cam_pan_angle = 0;
 
-//static uint8_t    osd_battery_pic_A = 0xb4;       // picture to show battery remaining
-//static float      osd_vbat_B = 0;               // voltage in milivolt
-//static float    timer_B = 0;                 // Battery B current
-//static uint16_t   osd_battery_remaining_B = 0;  // 0 to 100 <=> 0 to 1000
-//static uint8_t    osd_battery_pic_B = 0xb4;     // picture to show battery remaining
-static float        start_Time = -1.0;
+static uint16_t     osd_start_time = 0;
 static uint8_t      osd_mode = 0;                   // Navigation mode from RC AC2 = CH5, APM = CH8
 static unsigned long mavLinkTimer = 0;
 static unsigned long runt =0;
-static unsigned long FTime = 0;
 static unsigned long landed = 4294967295UL;
 
 static uint8_t      osd_off_switch = 0;

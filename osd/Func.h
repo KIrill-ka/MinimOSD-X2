@@ -84,12 +84,12 @@ void setHomeVars()
   }
 }
 
-void setFdataVars(){
+void setFdataVars() {
 
   if (takeofftime == 0 && osd_alt_to_home > 5 && osd_throttle > 10){
     takeofftime = 1;
     tdistance = 0;
-    FTime = (millis()/1000);
+    osd_start_time = millis()/1000;
   }
   
 //  if ((millis() - dt) >= 1000){

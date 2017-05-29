@@ -219,8 +219,19 @@ void panCamPos(int first_col, int first_line) {
 // Staus  : done
 void panFdata() {
     osd.setPanel(11, 3);
-//    osd.printf("%c%3i%c%02i|%c%5.0f%c|%c%5.0f%c|%c%5.0f%c|%c%5.0f%c|%c%5.0f%c|%c%5.0f%c", 0x08,((int)start_Time/60)%60,0x3A,(int)start_Time%60, 0x0b, ((max_home_distance) * converth), high, 0x1b, ((tdistance) * converth), high, 0x13,(max_osd_airspeed * converts), spe,0x14,(max_osd_groundspeed * converts),spe,0x12, (max_osd_home_alt * converth), high,0x1d,(max_osd_windspeed * converts),spe);
-    osd.printf_P(PSTR("%c%3i%c%02i|%c%5.0f%c|%c%5.0f%c|%c%5i%c|%c%5i%c|%c%5i%c|%c%5i%c|%c%5.0f%c|%c%11.6f|%c%11.6f"), 0x08,((int)(start_Time/60)),0x3a,(int)start_Time%60, 0x0b, ((max_home_distance) * converth), high, 0x8f, (tdistance * converth), high, 0x13,(int)(max_osd_airspeed * converts), spe,0x14,(int)(max_osd_groundspeed * converts),spe,0x12, (int)(max_osd_home_alt * converth), high,0x1d,(int)(max_osd_windspeed * converts),spe, 0x17, mah_used, 0x01, 0x03, (double)osd_lat, 0x04, (double)osd_lon);
+    uint16_t t;
+
+    t = millis()/1000 - osd_start_time;
+    osd.printf_P(PSTR("\x08%3u:%02u|\x0b%5.0f%c|\x8f%5.0f%c|\x13%5i%c|\x14%5i%c|\x12%5i%c|\x1d%5i%c|\x17%5.0f\x01|\x03%11.6f|\x04%11.6f"),
+                t/60, t%60, 
+                max_home_distance * converth, high, 
+                (tdistance * converth), high, 
+                (int)(max_osd_airspeed * converts), spe,
+                (int)(max_osd_groundspeed * converts), spe,
+                (int)(max_osd_home_alt * converth), high,
+                (int)(max_osd_windspeed * converts), spe,
+                mah_used,
+                osd_lat, osd_lon);
     check_rssi();
     check_warn();
     panWarn(11, 1);
@@ -702,17 +713,10 @@ void panBatteryPercent(int first_col, int first_line){
 
 void panTime(int first_col, int first_line){
     osd.setPanel(first_col, first_line);
+    uint16_t t;
     
-    start_Time = (millis()/1000) - FTime;
-//    osd.printf("%c%2i%c%02i", 0x08,((int)start_Time/60)%60,0x3A,(int)start_Time%60);
-//    osd.printf("%2i%c%02i",((int)start_Time/60)%60,0x3A,(int)start_Time%60);
-
-
-//    if((int)start_Time < 36000) oszt=60;
-    osd.printf_P(PSTR("%3i%c%02i"), ((int)start_Time/60), 0x3a, (int)start_Time%60);
-//    }else{
-//    osd.printf("%2i%c%02i", ((int)start_Time/3600)%60, 0x3A, ((int)start_Time/60)%60);
-//    }
+    t = millis()/1000 - osd_start_time;
+    osd.printf_P(PSTR("%3u:%02u"), t/60, t%60);
 }
 
 /* **************************************************************** */
