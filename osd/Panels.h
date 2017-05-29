@@ -295,43 +295,41 @@ void panEff(int first_col, int first_line){
 
 void showClimbEfficiency(uint8_t x, uint8_t y, uint8_t flags)
 {
- float alt = osd_alt_to_home;
- float e;
- uint8_t f = osd_statf1;
+ float alt, spd;
+ uint16_t ef;
+
  osd.setPanel(x, y);
 
  if(osd_statf1 & TRIG1S_F1) {
-  if(!(f & CLIMB_EFF_DET_F1) || alt - climb_eff_alt_start < 1) {
-   /* climb detection: check that altitude grows for one second */
-   f |= CLIMB_EFF_DET_F1;
-   climb_eff_alt_prev = alt;
-   climb_eff_alt_start = alt;
-   climb_eff_mah_used_start = mah_used;
-  } else {
-   f |= CLIMB_EFF_VALID_F1;
-  }
- } 
- 
- if(alt < climb_eff_alt_prev) {
-  f &= ~CLIMB_EFF_DET_F1;
-  f &= ~CLIMB_EFF_VALID_F1;
- }
- osd_statf1 = f;
- climb_eff_alt_prev = alt;
+  alt = osd_alt_to_home;
+  spd = osd_airspeed;
+  if(alt - climb_eff_alt_start <= 0) climb_eff_prev = climb_eff = 10000;
+  else {
+   float e, energy_adj;
+   energy_adj = (spd*spd - climb_eff_spd_start*climb_eff_spd_start)/(9.8*2);
+   e = (mah_used - climb_eff_mah_used_start) * 1000 
+       / (alt - climb_eff_alt_start + energy_adj); /* mAh/km*/
 
- if((f & CLIMB_EFF_VALID_F1)) {
-  if(alt > climb_eff_alt_start) {
-    e = (mah_used - climb_eff_mah_used_start) * 1000 / (alt - climb_eff_alt_start);
-    if (e > 9999) e = 9999;
-    else if(e < -999) e = -999; /* negative current... */
-  } else {
-    e = 9999; /* alt statys at 0 */
+   if(e < -999) climb_eff_prev = climb_eff = -999; /* negative current... */
+   else if(e > 9999) climb_eff = climb_eff_prev = 10000;
+   else {
+    ef = e;
+    if(climb_eff_prev <= 9999) climb_eff = (climb_eff_prev + ef)/2;
+    else climb_eff = ef;
+    climb_eff_prev = ef; 
+   }
   }
-  osd.printf_P(PSTR("%c%4.0f%c"), '\xb6', e, '\x01');
- } else {
-  osd.printf_P(PSTR("%c"), '\xb6');
+  climb_eff_alt_start = alt;
+  climb_eff_mah_used_start = mah_used;
+  climb_eff_spd_start = spd;
  }
-
+  
+ ef = climb_eff;
+ if(flags & 0x20) osd.write('\xb6');
+ if(ef <= 9999) {
+  osd.printf_P(PSTR("%4i"), ef);
+  if(flags & 0x10) osd.write('\x01');
+ }
 }
 
 /* **************************************************************** */
@@ -619,13 +617,13 @@ void check_warn()
  }
 
  if(osd_statf1 & TRIG1S_F1) {
- if (osd_fix_type < 2) wmask |= 1;
+  if (osd_fix_type < 2) wmask |= 1;
   if (osd_vbat_A < float(battv)/10.0 
       || (osd_battery_remaining_A < batt_warn_level && batt_warn_level != 0)) 
-  wmask |= 8;
- if (osd_statf & WARN_MOTOR_F) wmask |= 32;
- else if (motor_warn) osd_statf |= WARN_MOTOR_F; // wait for 1 sec for ESC to react before displaying the alert 
- if(millis() > last_mav_data_ts + 2200) wmask |= 64;
+   wmask |= 8;
+  if (osd_statf & WARN_MOTOR_F) wmask |= 32;
+  else if (motor_warn) osd_statf |= WARN_MOTOR_F; // wait for 1 sec for ESC to react before displaying the alert 
+  if(millis() > last_mav_data_ts + 2200) wmask |= 64;
  } else {
   if(prev_wmask != 0 || wmask == 0) return;
  }

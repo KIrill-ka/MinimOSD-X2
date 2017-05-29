@@ -72,8 +72,10 @@ static float        palt = 0;
 static float        osd_climb = 0;
 
 static float        climb_eff_alt_start = 0;
-static float        climb_eff_alt_prev = 0;
 static float        climb_eff_mah_used_start = 0;
+static float        climb_eff_spd_start = 0;
+static int16_t		climb_eff = 0;
+static int16_t		climb_eff_prev = 0;
 
 static float        osd_lat = 0;                    // latidude
 static float        osd_lon = 0;                    // longitude
@@ -128,8 +130,6 @@ static uint8_t      osd_statf = 0;
 #define TRIG100MS_F1         1 // set once per 100ms
 #define TICK100_F1           2 // toggles every 100ms
 #define EFF_RESET_GLIDE_F1   4 // marks transition from powered flight
-#define CLIMB_EFF_DET_F1     8 // climb detection is active (climb efficiency vars are reset)
-#define CLIMB_EFF_VALID_F1   16 // climb efficiency display enabled
 #define TICK_F1              32 // toggles every second
 #define TRIG1S_F1            64 // set once per second
 static uint8_t      osd_statf1 = 0;
