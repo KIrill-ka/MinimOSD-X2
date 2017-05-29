@@ -1,7 +1,7 @@
 
 #define FW_VER_HI 0
 #define FW_VER_MID 6
-#define FW_VER_LO 0
+#define FW_VER_LO 1
 
 #define on 1
 #define off 0
@@ -12,7 +12,7 @@
 
 // new eeprom format version
 #define EEP_VER_START 4
-#define EEP_VER_CURRENT 6
+#define EEP_VER_CURRENT 7
 
 // EEPROM Stepping, be careful not to overstep. 
 // We reserved floats for just to be sure if some values needs to be
@@ -192,6 +192,7 @@
 #define EEP_BATT_B_VOLT 235
 #define EEP_GPS_REL_ALT 237
 #define EEP_MAV_STATUSTEXT 239
+#define EEP_WIND_ARROW  241
 
 #define SIGN_MSL_ON_ADDR 876
 #define SIGN_HA_ON_ADDR 878

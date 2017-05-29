@@ -5,6 +5,7 @@ void check_rssi();
 void check_panel_switch(int8_t allow_autoswitch);
 void showGPSRelAlt(uint8_t x, uint8_t y, uint8_t flags);
 void showMAVStatusText(uint8_t x, uint8_t y, uint8_t flags);
+void showWindArrow(uint8_t x, uint8_t y, uint8_t flags);
 
 //extern int8_t debug_r;
 
@@ -133,6 +134,7 @@ void writePanels()
       if(get_item_config(EEP_BATT_B_VOLT, panel, &x, &y, &f)) showBatteryBVolt(x, y, f);
       if(get_item_config(EEP_EF_CLIMB, panel, &x, &y, &f)) showClimbEfficiency(x, y, f);
       if(get_item_config(EEP_GPS_REL_ALT, panel, &x, &y, &f)) showGPSRelAlt(x, y, f);
+      if(get_item_config(EEP_WIND_ARROW, panel, &x, &y, &f)) showWindArrow(x, y, f);
 
     } else {
      /* show warnings even if screen is disabled */
@@ -396,19 +398,35 @@ void panCALLSIGN(int first_col, int first_line){
 // Staus  : done
 
 void panWindSpeed(int first_col, int first_line){
-    int8_t osd_wind_arrow_rotate_int;
+    int8_t arrow;
+
     osd.setPanel(first_col, first_line);
 
-    if (osd_winddirection < 0)
-     osd_wind_arrow_rotate_int = round(((osd_winddirection + 360) - osd_heading)/360.0 * 16.0) + 9; //Convert to int 1-16
-    else
-     osd_wind_arrow_rotate_int = round((osd_winddirection - osd_heading)/360.0 * 16.0) + 9; //Convert to int 1-16
-    if(osd_wind_arrow_rotate_int > 16 ) osd_wind_arrow_rotate_int -= 16; //normalize
-    else if(osd_wind_arrow_rotate_int < 1 ) osd_wind_arrow_rotate_int += 16; //normalize
-    //nor_osd_windspeed = osd_windspeed * 0.010 + nor_osd_windspeed * 0.990;    
-    osd.printf_P(PSTR("%c%3.0f%c"),0x1d,(double)(osd_windspeed * converts),spe);
+    arrow = round((osd_winddirection - osd_heading)/(360.0 / 16.0)) + 9; // scale to 1-16
+    /* minimum value for arrow is -15 ((-180-360)/22.5  + 9) 
+       maximum value is 17 (180/22.5+9)
+       Even if winddirection is 0..360, arrow would be 25, which is still ok with the
+       normalization below. */
+    if(arrow > 16 ) arrow -= 16;
+    else if(arrow < 1 ) arrow += 16;
+    osd.printf_P(PSTR("%c%3.0f%c"),0x1d,osd_windspeed * converts,spe);
     
-    showArrow((uint8_t)osd_wind_arrow_rotate_int);
+    showArrow((uint8_t)arrow);
+}
+
+void showWindArrow(uint8_t x, uint8_t y, uint8_t flags)
+{
+    int8_t arrow;
+    osd.setPanel(x, y);
+    if(flags & 0x20) osd.write('\x1d');
+    arrow = round((osd_winddirection - osd_heading)/(360.0 / 16.0)) + 9; // scale to 1-16
+    /* minimum value for arrow is -15 ((-180-360)/22.5  + 9) 
+       maximum value is 17 (180/22.5+9)
+       Even if winddirection is 0..360, arrow would be 25, which is still ok with the
+       normalization below. */
+    if(arrow > 16 ) arrow -= 16;
+    else if(arrow < 1 ) arrow += 16;
+    showArrow((uint8_t)arrow);
 }
 
 void check_panel_switch(int8_t allow_autoswitch) {

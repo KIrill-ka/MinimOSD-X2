@@ -7,9 +7,9 @@ if {[info exists env(HOME)]} {
 }
 
 
-set eeprom_version 6
+set eeprom_version 7
 set npanels 3
-set fw_version "0.6.0"
+set fw_version "0.6.1"
 
 array set name2addr {
 Pitch_en 6 Pitch_x 8 Pitch_y 10
@@ -48,6 +48,7 @@ EF_CLIMB_panel_item 233
 BATT_B_VOLT_panel_item 235
 GPS_REL_ALT_panel_item 237
 MAV_MSG_panel_item 239
+WIND_ARROW_panel_item 241
 
 SIGN_MSL_ON 876
 SIGN_HA_ON 878
@@ -123,7 +124,7 @@ set cfg_new_vars {
  VOFFSET HOFFSET MAV_BAUD
  MOTOR_WARN_CURR MOTOR_WARN_THR
  CamPos
- BATT_B_VOLT EF_CLIMB GPS_REL_ALT MAV_MSG
+ BATT_B_VOLT EF_CLIMB GPS_REL_ALT MAV_MSG WIND_ARROW
  PANELS_NUM 
 }
 
@@ -473,6 +474,7 @@ array set flags_info {
   GPS_REL_ALT {s {bit_flag 0x20} u {bit_flag 0x10} l {bit_flag 0x8}}
   BATT_B_VOLT {u {bit_flag 0x10}}
   MAV_MSG {w {dec_flag 31}}
+  WIND_ARROW {s {bit_flag 0x20}}
 }
 proc str2flags {var s} {
  set f 0
