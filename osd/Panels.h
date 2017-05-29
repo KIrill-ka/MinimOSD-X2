@@ -883,7 +883,7 @@ void panGPSats(int first_col, int first_line){
     
     byte gps_str = 0x2a;
     if (osd_fix_type == 2) gps_str = 0x1f;
-    else if (osd_fix_type == 3) gps_str = 0x0f;
+    else if (osd_fix_type >= 3) gps_str = 0x0f;
     
     if (eph >= 200 && (osd_statf1 & TICK_F1) != 0)
        gps_str = 0x20;
