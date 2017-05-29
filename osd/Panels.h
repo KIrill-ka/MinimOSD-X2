@@ -192,12 +192,13 @@ void panCOG(int first_col, int first_line){
 // Staus  : done
 
 void panDistance(int first_col, int first_line){
+    float d;
     osd.setPanel(first_col, first_line);
-    //do_converts();
-    if ((tdistance * converth) > 9999.0) {
-      osd.printf_P(PSTR("%c%5.2f%c"), 0x8f, ((tdistance * converth) / distconv), distchar);
-    }else{
-      osd.printf_P(PSTR("%c%5.0f%c"), 0x8f, (tdistance * converth), high);
+    d = tdistance * converth;
+    if (d > 9999.0) {
+      osd.printf_P(PSTR("\x8f%4.2f%c"), d / distconv, distchar);
+    } else {
+      osd.printf_P(PSTR("\x8f%4.0f%c"), d, high);
     }
 }
 
@@ -725,9 +726,9 @@ void panHomeDis(int first_col, int first_line){
     osd.setPanel(first_col, first_line);
 
     if ((osd_home_distance * converth) > 9999.0) {
-      osd.printf_P(PSTR("%c%5.2f%c"), 0x0b, ((osd_home_distance * converth) / distconv), distchar);
+      osd.printf_P(PSTR("\x0b%5.2f%c"), ((osd_home_distance * converth) / distconv), distchar);
     }else{
-      osd.printf_P(PSTR("%c%5.0f%c"), 0x0b, (osd_home_distance * converth), high);
+      osd.printf_P(PSTR("\x0b%5.0f%c"), (osd_home_distance * converth), high);
     }
 
 }
