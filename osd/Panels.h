@@ -604,23 +604,32 @@ void check_warn()
  uint8_t wmask = 0;
  uint8_t bit, prev_warn;
  uint8_t motor_warn;
+ static uint8_t prev_wmask = 0;
 
  motor_warn = osd_throttle > motor_warn_thr 
          && osd_curr_A < (int16_t)motor_warn_curr*10;
 
  if((osd_statf & WARN_MOTOR_F) != 0 && !motor_warn) osd_statf &= ~WARN_MOTOR_F;
 
- if (!(osd_statf1 & TRIG1S_F1)) return;
+ if (((osd_statf1 & TRIG100MS_F1) && !prev_wmask) || (osd_statf1 & TRIG1S_F1)) {
+  /* if there was no warnings displayed, show RSSI and SPEED alerts ASAP */
+  if (osd_airspeed * converts < stall && takeofftime == 1) wmask |= 2;
+  if (osd_airspeed * converts > (float)overspeed) wmask |= 4;
+  if (rssi < rssi_warn_level && rssi != -99) wmask |= 16;
+ }
 
+ if(osd_statf1 & TRIG1S_F1) {
  if (osd_fix_type < 2) wmask |= 1;
- if (osd_airspeed * converts < stall && takeofftime == 1) wmask |= 2;
- if (osd_airspeed * converts > (float)overspeed) wmask |= 4;
- if (osd_vbat_A < float(battv)/10.0 || (osd_battery_remaining_A < batt_warn_level && batt_warn_level != 0)) 
+  if (osd_vbat_A < float(battv)/10.0 
+      || (osd_battery_remaining_A < batt_warn_level && batt_warn_level != 0)) 
   wmask |= 8;
- if (rssi < rssi_warn_level && rssi != -99) wmask |= 16;
  if (osd_statf & WARN_MOTOR_F) wmask |= 32;
  else if (motor_warn) osd_statf |= WARN_MOTOR_F; // wait for 1 sec for ESC to react before displaying the alert 
  if(millis() > last_mav_data_ts + 2200) wmask |= 64;
+ } else {
+  if(prev_wmask != 0 || wmask == 0) return;
+ }
+ prev_wmask = wmask;
 
  if(wmask == 0) warning = 0;
  else {
